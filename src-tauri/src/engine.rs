@@ -420,7 +420,7 @@ impl Engine {
     }
 
     /// Per-file progress for a torrent.
-    pub fn files(&self, ih: &InfoHash) -> Result<Vec<FileProgress>> {
+    pub async fn files(&self, ih: &InfoHash) -> Result<Vec<FileProgress>> {
         let handle = self.get_handle(ih)?;
         let stats = handle.stats();
         let only_files = handle.only_files();
