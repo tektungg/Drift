@@ -3,6 +3,7 @@
 mod category;
 mod magnet;
 mod state;
+mod settings;
 
 fn main() {
     tauri::Builder::default()
