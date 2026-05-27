@@ -22,6 +22,18 @@
         "transparent": false,
         "backgroundColor": "#F5F1E8",
         "visible": true
+      },
+      {
+        "label": "magnet-toast",
+        "url": "toast.html",
+        "width": 360,
+        "height": 120,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false,
+        "backgroundColor": "#F5F1E8"
       }
     ],
     "security": {

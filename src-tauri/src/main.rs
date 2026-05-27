@@ -95,6 +95,20 @@ async fn main() {
             // Install system tray
             drift::tray::install(app.handle())?;
 
+            // Start the clipboard watcher
+            drift::clipboard::start(app.handle().clone());
+
+            // Position the magnet-toast bottom-right of the primary monitor
+            if let Some(t) = app.get_webview_window("magnet-toast") {
+                if let Ok(Some(m)) = t.primary_monitor() {
+                    let size = m.size();
+                    let _ = t.set_position(tauri::PhysicalPosition::new(
+                        size.width as i32 - 360 - 16,
+                        size.height as i32 - 120 - 56, // 56 leaves room above taskbar
+                    ));
+                }
+            }
+
             // Cold-start: if launched with a magnet/torrent arg, emit it after the window is ready
             let argv: Vec<String> = std::env::args().collect();
             for arg in argv.iter().skip(1) {
