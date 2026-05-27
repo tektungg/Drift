@@ -104,7 +104,45 @@ document.getElementById("btn-settings").onclick = () => toggleSettings();
 // Stubs filled by later tasks:
 function openAddDialog() { /* Task 11 */ }
 function toggleSettings() { /* Task 16 */ }
-function openContextMenu(ih, x, y) { /* Task 10 */ }
+
+function openContextMenu(ih, x, y) {
+  closeContextMenu();
+  const t = torrents.find(x => x.infohash === ih);
+  if (!t) return;
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+  const items = [
+    t.state_label === "paused"
+      ? { label: "Resume", fn: () => invoke("resume", { infohash: ih }) }
+      : { label: "Pause",  fn: () => invoke("pause",  { infohash: ih }) },
+    { label: "Open folder", fn: () => invoke("open_folder", { infohash: ih }) },
+    { label: "Copy magnet", fn: () => invoke("copy_magnet", { infohash: ih }) },
+    { label: "Remove", fn: () => invoke("remove", { infohash: ih, deleteFiles: false }) },
+    { label: "Remove + delete files", fn: () => invoke("remove", { infohash: ih, deleteFiles: true }) },
+  ];
+  menu.innerHTML = items.map((it, i) => `<div class="item" data-i="${i}">${it.label}</div>`).join("");
+  document.body.appendChild(menu);
+  menu.querySelectorAll(".item").forEach(n => n.onclick = async () => {
+    try { await items[+n.dataset.i].fn(); } catch (e) { showToast("error", String(e)); }
+    closeContextMenu();
+  });
+  document.addEventListener("click", closeContextMenu, { once: true });
+}
+function closeContextMenu() { document.querySelectorAll(".context-menu").forEach(n => n.remove()); }
+
+function showToast(kind, message) {
+  const stack = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.textContent = message;
+  stack.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+
+// listen for toast events from Rust
+listen("toast", (e) => showToast(e.payload.kind, e.payload.message));
 
 // Boot: load current snapshot from Rust + subscribe to events
 (async () => {

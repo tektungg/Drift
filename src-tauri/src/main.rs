@@ -43,6 +43,8 @@ async fn main() {
             commands::peek,
             commands::get_settings,
             commands::set_settings,
+            commands::open_folder,
+            commands::copy_magnet,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

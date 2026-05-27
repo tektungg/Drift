@@ -119,3 +119,21 @@ pub fn set_settings(ctx: tauri::State<'_, AppCtx>, value: serde_json::Value) -> 
 fn chrono_now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
+
+#[tauri::command]
+pub fn open_folder(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(), String> {
+    let snap = ctx.state.snapshot();
+    let rec = snap.torrents.iter().find(|t| t.infohash == infohash).ok_or("not_found")?;
+    tauri_plugin_opener::open_path(&rec.save_path, None::<&str>).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn copy_magnet(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(), String> {
+    let snap = ctx.state.snapshot();
+    let rec = snap.torrents.iter().find(|t| t.infohash == infohash).ok_or("not_found")?;
+    let magnet = format!(
+        "magnet:?xt=urn:btih:{}&dn={}",
+        rec.infohash, urlencoding::encode(&rec.display_name)
+    );
+    clipboard_win::set_clipboard_string(&magnet).map_err(|e| format!("{e:?}"))
+}
