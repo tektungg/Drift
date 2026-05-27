@@ -1,0 +1,22 @@
+# Brainstorming session artifacts (browser companion)
+.superpowers/
+
+# Rust / Tauri
+/target/
+/src-tauri/target/
+**/*.rs.bk
+Cargo.lock
+
+# Node / frontend tooling (if added later)
+node_modules/
+dist/
+.vite/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Drift runtime data (should never live in repo)
+*.log
