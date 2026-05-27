@@ -4,6 +4,7 @@ mod category;
 mod magnet;
 mod state;
 mod settings;
+mod engine;
 
 fn main() {
     tauri::Builder::default()
