@@ -102,7 +102,87 @@ document.getElementById("btn-add").onclick = () => openAddDialog();
 document.getElementById("btn-settings").onclick = () => toggleSettings();
 
 // Stubs filled by later tasks:
-function openAddDialog() { /* Task 11 */ }
+async function openAddDialog(initialSource = "") {
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+    <div class="modal-backdrop">
+      <div class="modal">
+        <h2>Add torrent</h2>
+        <textarea id="addsrc" rows="3" placeholder="Paste a magnet link or drop a .torrent file"></textarea>
+        <div id="addmeta" style="margin-top:14px; min-height:80px; font-size:13px; color:var(--ink-soft)"></div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px">
+          <button class="btn-ghost" id="addcancel">Cancel</button>
+          <button class="btn-primary" id="addconfirm" disabled>Add</button>
+        </div>
+      </div>
+    </div>`;
+  const ta = document.getElementById("addsrc");
+  ta.value = initialSource;
+  const meta = document.getElementById("addmeta");
+  const btn = document.getElementById("addconfirm");
+  let lastMeta = null;
+  let selected = null;
+
+  async function refresh() {
+    const src = ta.value.trim();
+    if (!src) { meta.textContent = ""; btn.disabled = true; return; }
+    meta.textContent = "Fetching metadata…";
+    btn.disabled = true;
+    try {
+      const m = await invoke("peek", { source: src });
+      lastMeta = m;
+      selected = m.files.map((_, i) => i);
+      renderMeta();
+      btn.disabled = false;
+    } catch (e) {
+      meta.textContent = "Couldn't read this torrent: " + e;
+    }
+  }
+
+  function renderMeta() {
+    if (!lastMeta) return;
+    const filesHtml = lastMeta.files.map((f, i) => `
+      <div class="file-row">
+        <label style="display:flex; gap:8px; align-items:center">
+          <input type="checkbox" data-i="${i}" ${selected.includes(i) ? "checked" : ""}>
+          <span>${escape(f.path)}</span>
+        </label>
+        <span>${fmtBytes(f.size)}</span>
+      </div>`).join("");
+    meta.innerHTML = `
+      <div style="color:var(--ink); margin-bottom:6px">${escape(lastMeta.name)}</div>
+      <div>${fmtBytes(lastMeta.total_size)} total · ${lastMeta.files.length} file(s)</div>
+      <div style="margin-top:8px">Will go to <code>${escape(lastMeta.predicted_save_path)}</code></div>
+      <div style="margin-top:10px; max-height:200px; overflow-y:auto">${filesHtml}</div>`;
+    meta.querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = () => {
+      const i = +cb.dataset.i;
+      if (cb.checked) { if (!selected.includes(i)) selected.push(i); }
+      else { selected = selected.filter(x => x !== i); }
+      btn.disabled = selected.length === 0;
+    });
+  }
+
+  ta.addEventListener("blur", refresh);
+  ta.addEventListener("paste", () => setTimeout(refresh, 0));
+  document.getElementById("addcancel").onclick = () => root.innerHTML = "";
+  document.getElementById("addconfirm").onclick = async () => {
+    try {
+      const allSelected = lastMeta && selected.length === lastMeta.files.length;
+      await invoke("add_torrent", {
+        req: { source: ta.value.trim(),
+               overridePath: null,
+               selectedFiles: allSelected ? null : selected }
+      });
+      root.innerHTML = "";
+      torrents = await invoke("snapshot");
+      renderAll();
+    } catch (e) {
+      showToast("error", e === "already_added" ? "Already in your list." : String(e));
+    }
+  };
+
+  if (initialSource) refresh();
+}
 function toggleSettings() { /* Task 16 */ }
 
 function openContextMenu(ih, x, y) {
@@ -161,3 +241,14 @@ listen("toast", (e) => showToast(e.payload.kind, e.payload.message));
     renderAll();
   });
 })();
+
+// Drag-drop on the whole window
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", async e => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  // Tauri provides the file path on drop; use it directly:
+  const path = file.path || file.name;
+  openAddDialog(path);
+});
