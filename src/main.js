@@ -95,7 +95,7 @@ function renderExpanded(t) {
       el.querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = async () => {
         const sel = [...el.querySelectorAll("input[type=checkbox]:checked")].map(x => +x.dataset.i);
         try { await invoke("set_file_selection", { infohash: t.infohash, selected: sel }); }
-        catch (e) { showToast("error", String(e)); cb.checked = !cb.checked; }
+        catch (e) { showToast("error", friendlyError(e)); cb.checked = !cb.checked; }
       });
     } catch (e) {
       el.innerHTML = `<div class="file-row">Couldn't load files: ${e}</div>`;
@@ -119,6 +119,16 @@ function fmtBytes(n) {
 }
 function fmtBps(n) { return `${fmtBytes(n)}/s`; }
 function escape(s) { const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+
+function friendlyError(e) {
+  const s = String(e);
+  if (s.includes("already_added")) return "Already in your list.";
+  if (s.toLowerCase().includes("not a magnet")) return "Couldn't read this torrent.";
+  if (s.includes("os error 112") || s.toLowerCase().includes("no space")) return "Disk full — torrent paused.";
+  if (s.toLowerCase().includes("permission denied")) return "Write permission denied — torrent paused.";
+  if (s.toLowerCase().includes("not_found")) return "Torrent not found.";
+  return s;
+}
 
 window.drift = { renderAll };  // for console debugging
 
@@ -202,7 +212,7 @@ async function openAddDialog(initialSource = "") {
       torrents = await invoke("snapshot");
       renderAll();
     } catch (e) {
-      showToast("error", e === "already_added" ? "Already in your list." : String(e));
+      showToast("error", friendlyError(e));
     }
   };
 
@@ -277,7 +287,7 @@ async function toggleSettings() {
           [k, document.getElementById("s-cat-"+k).value.split(/\s+/).filter(Boolean)])),
     };
     try { await invoke("set_settings", { value }); panel.classList.remove("open"); showToast("info", "Settings saved."); }
-    catch (e) { showToast("error", String(e)); }
+    catch (e) { showToast("error", friendlyError(e)); }
   };
 }
 
@@ -301,7 +311,7 @@ function openContextMenu(ih, x, y) {
   menu.innerHTML = items.map((it, i) => `<div class="item" data-i="${i}">${it.label}</div>`).join("");
   document.body.appendChild(menu);
   menu.querySelectorAll(".item").forEach(n => n.onclick = async () => {
-    try { await items[+n.dataset.i].fn(); } catch (e) { showToast("error", String(e)); }
+    try { await items[+n.dataset.i].fn(); } catch (e) { showToast("error", friendlyError(e)); }
     closeContextMenu();
   });
   document.addEventListener("click", closeContextMenu, { once: true });
