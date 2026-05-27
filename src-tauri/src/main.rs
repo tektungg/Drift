@@ -122,18 +122,41 @@ async fn main() {
                 }
             });
 
-            // Close button → hide to tray (if enabled in settings)
+            // Window events: close-to-tray + native drag-drop handling.
+            //
+            // Drag-drop NOTE: Tauri 2 emits `tauri://drag-drop` only to its own
+            // window-labeled event target. The CDN-loaded @tauri-apps/api/event
+            // `listen()` does not always pick that up reliably across minor
+            // versions. Handling it in Rust via WindowEvent::DragDrop is the
+            // stable path — we then re-emit the file path through our existing
+            // `open-source` event which the frontend already subscribes to.
             let main_window = app.get_webview_window("main").unwrap();
             let settings_for_close = settings.clone();
             let app_handle_for_close = app.handle().clone();
             main_window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    if settings_for_close.get().close_to_tray {
-                        api.prevent_close();
-                        if let Some(w) = app_handle_for_close.get_webview_window("main") {
-                            let _ = w.hide();
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        if settings_for_close.get().close_to_tray {
+                            api.prevent_close();
+                            if let Some(w) = app_handle_for_close.get_webview_window("main") {
+                                let _ = w.hide();
+                            }
                         }
                     }
+                    tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                        // Prefer .torrent files; otherwise take the first dropped path
+                        // (which is fine if the user drops a single .torrent without
+                        // the extension preserved, or a magnet shortcut, etc.).
+                        let chosen = paths
+                            .iter()
+                            .find(|p| p.extension().map_or(false, |e| e.eq_ignore_ascii_case("torrent")))
+                            .or_else(|| paths.first());
+                        if let Some(path) = chosen {
+                            let payload = path.to_string_lossy().into_owned();
+                            let _ = app_handle_for_close.emit("open-source", payload);
+                        }
+                    }
+                    _ => {}
                 }
             });
 

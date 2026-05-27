@@ -5,38 +5,42 @@ use tauri::{AppHandle, Emitter, Manager};
 
 pub static ENABLED: AtomicBool = AtomicBool::new(true);
 
+/// Background thread that polls the Windows clipboard every 500ms looking
+/// for newly-copied magnet links. When it sees one that's NOT already in
+/// the user's torrent list, it emits `magnet-detected` so the toast window
+/// can offer to add it.
+///
+/// We compare clipboard TEXT (not Windows' opaque sequence number) because:
+///   1. the sequence-number API can misbehave in some sandbox / privilege
+///      contexts and silently report "no change" forever;
+///   2. text comparison is naturally idempotent — copying the same magnet
+///      twice in a row only fires once, and copying B then re-copying A
+///      correctly fires for A again because the text changed.
 pub fn start(app: AppHandle) {
     std::thread::spawn(move || {
-        let mut last_seq: u32 = 0;
-        let mut dismissed: std::collections::HashSet<String> = Default::default();
+        let mut last_text: Option<String> = None;
+
         loop {
             std::thread::sleep(std::time::Duration::from_millis(500));
             if !ENABLED.load(Ordering::Relaxed) {
                 continue;
             }
 
-            // Use clipboard sequence number to detect changes (no-op open needed).
-            let seq: u32 = clipboard_win::raw::seq_num()
-                .map(|n| u32::from(n))
-                .unwrap_or_else(|| last_seq.wrapping_add(1));
-
-            if seq == last_seq {
-                continue;
-            }
-            last_seq = seq;
-
             let Ok(txt) = clipboard_win::get_clipboard_string() else {
                 continue;
             };
+            if last_text.as_deref() == Some(txt.as_str()) {
+                continue;
+            }
+            last_text = Some(txt.clone());
+
             if !txt.starts_with("magnet:?") {
                 continue;
             }
             let Ok(parsed) = magnet::parse(&txt) else {
                 continue;
             };
-            if dismissed.contains(parsed.infohash.as_str()) {
-                continue;
-            }
+            // Skip if already in the user's torrent list — don't nag.
             let ctx = app.state::<AppCtx>();
             if ctx.state.contains(parsed.infohash.as_str()) {
                 continue;
@@ -49,7 +53,6 @@ pub fn start(app: AppHandle) {
                     "uri": txt,
                 }),
             );
-            dismissed.insert(parsed.infohash.as_str().to_string());
         }
     });
 }

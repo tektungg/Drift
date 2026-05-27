@@ -400,17 +400,8 @@ listen("open-source", (e) => openAddDialog(e.payload));
   });
 })();
 
-// Drag-drop on the whole window.
-//
-// Tauri 2 intercepts native OS file drops at the window level — HTML5
-// `drop` events NEVER fire with a usable path for external file drags.
-// The `Window.onDragDropEvent()` helper isn't reliably exposed via the
-// CDN'd window module in every Tauri 2 minor version, so subscribe to
-// the raw Tauri event instead. This works regardless of which binding
-// version the CDN happens to ship.
-listen("tauri://drag-drop", (event) => {
-  const paths = event.payload?.paths;
-  if (!paths || paths.length === 0) return;
-  const torrentPath = paths.find(p => /\.torrent$/i.test(p)) ?? paths[0];
-  openAddDialog(torrentPath);
-});
+// Drag-drop is handled entirely in Rust via WindowEvent::DragDrop, which
+// re-emits the dropped path as our existing `open-source` event. See main.rs.
+// (We can't reliably listen() to `tauri://drag-drop` here because Tauri 2 emits
+//  it to a window-scoped EventTarget that the CDN-loaded event module doesn't
+//  always pick up across minor versions.)
