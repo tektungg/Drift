@@ -44,7 +44,17 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
     let cfg = ctx.settings.get();
     let save_path = match req.override_path {
         Some(p) => PathBuf::from(p),
-        None => Engine::pick_save_path(&cfg.download_root, &meta, &cfg.category_map.clone().into()),
+        None => {
+            let mut p = Engine::pick_save_path(&cfg.download_root, &meta, &cfg.category_map.clone().into());
+            // Many torrents (e.g. FitGirl repacks) ship file lists with no shared top-level
+            // folder — every entry is a bare filename. librqbit would drop these straight into
+            // the category dir, polluting it. Wrap such "flat" multi-file torrents in a folder
+            // named after the torrent itself.
+            if needs_name_wrap(&meta.files) {
+                p = p.join(sanitize_for_windows(&meta.name));
+            }
+            p
+        }
     };
     std::fs::create_dir_all(&save_path).map_err(|e| e.to_string())?;
 
@@ -142,6 +152,70 @@ fn apply_startup_registration(enable: bool) -> anyhow::Result<()> {
 
 fn chrono_now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+}
+
+/// Returns true when a multi-file torrent's entries do NOT share a single
+/// top-level directory, meaning librqbit would drop them straight into the
+/// destination dir. Wrapping in the torrent's name folder fixes that.
+fn needs_name_wrap(files: &[crate::category::FileEntry]) -> bool {
+    if files.len() <= 1 { return false; }
+    fn first_seg(p: &str) -> Option<&str> {
+        p.split(['/', '\\']).find(|s| !s.is_empty())
+    }
+    let Some(first) = first_seg(&files[0].path) else { return true; };
+    // If any file's first segment differs (or is missing), there is no shared
+    // top-level folder — wrap.
+    !files.iter().all(|f| first_seg(&f.path) == Some(first))
+}
+
+/// Replace characters that are illegal in Windows filenames with `_`, and
+/// trim trailing spaces/dots (also illegal). Returns "Untitled" if the
+/// resulting string is empty.
+fn sanitize_for_windows(name: &str) -> String {
+    let mut s: String = name.chars().map(|c| match c {
+        '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+        c if (c as u32) < 32 => '_',
+        c => c,
+    }).collect();
+    while matches!(s.chars().last(), Some(' ') | Some('.')) { s.pop(); }
+    if s.is_empty() { "Untitled".into() } else { s }
+}
+
+#[cfg(test)]
+mod helper_tests {
+    use super::*;
+    use crate::category::FileEntry;
+
+    fn f(p: &str) -> FileEntry { FileEntry { path: p.into(), size: 1 } }
+
+    #[test]
+    fn single_file_no_wrap() {
+        assert!(!needs_name_wrap(&[f("movie.mkv")]));
+    }
+    #[test]
+    fn multi_file_shared_prefix_no_wrap() {
+        assert!(!needs_name_wrap(&[f("Release/movie.mkv"), f("Release/subs.srt")]));
+    }
+    #[test]
+    fn multi_file_flat_wraps() {
+        assert!(needs_name_wrap(&[f("fg-01.bin"), f("fg-02.bin"), f("fg-03.bin")]));
+    }
+    #[test]
+    fn multi_file_mixed_prefixes_wraps() {
+        assert!(needs_name_wrap(&[f("a/x.bin"), f("b/y.bin")]));
+    }
+    #[test]
+    fn sanitize_strips_illegal_chars() {
+        assert_eq!(sanitize_for_windows("Foo: Bar/Baz?"), "Foo_ Bar_Baz_");
+    }
+    #[test]
+    fn sanitize_trims_trailing_dots_spaces() {
+        assert_eq!(sanitize_for_windows("Movie name. "), "Movie name");
+    }
+    #[test]
+    fn sanitize_empty_becomes_untitled() {
+        assert_eq!(sanitize_for_windows("..."), "Untitled");
+    }
 }
 
 #[tauri::command]

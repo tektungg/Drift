@@ -158,20 +158,26 @@ async function openAddDialog(initialSource = "") {
   const btn = document.getElementById("addconfirm");
   let lastMeta = null;
   let selected = null;
+  let lastFetched = "";  // prevents re-peek on the same source
+  let fetchTimer = null;
 
   async function refresh() {
     const src = ta.value.trim();
-    if (!src) { meta.textContent = ""; btn.disabled = true; return; }
+    if (!src) { meta.textContent = ""; btn.disabled = true; lastFetched = ""; return; }
+    if (src === lastFetched) return;  // already have metadata for this exact source
+    lastFetched = src;
     meta.textContent = "Fetching metadata…";
     btn.disabled = true;
     try {
       const m = await invoke("peek", { source: src });
+      if (ta.value.trim() !== src) return;  // user changed source mid-fetch
       lastMeta = m;
       selected = m.files.map((_, i) => i);
       renderMeta();
       btn.disabled = false;
     } catch (e) {
       meta.textContent = "Couldn't read this torrent: " + e;
+      lastFetched = "";  // allow retry on the same string after a failure
     }
   }
 
@@ -198,10 +204,18 @@ async function openAddDialog(initialSource = "") {
     });
   }
 
-  ta.addEventListener("blur", refresh);
+  // Refresh strategy: peek immediately on paste, and after the user stops typing
+  // for 500ms. Never on blur — clicking Add or dragging the window must not retrigger.
   ta.addEventListener("paste", () => setTimeout(refresh, 0));
+  ta.addEventListener("input", () => {
+    clearTimeout(fetchTimer);
+    fetchTimer = setTimeout(refresh, 500);
+  });
   document.getElementById("addcancel").onclick = () => root.innerHTML = "";
   document.getElementById("addconfirm").onclick = async () => {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Adding…";
     try {
       const allSelected = lastMeta && selected.length === lastMeta.files.length;
       await invoke("add_torrent", {
@@ -213,6 +227,8 @@ async function openAddDialog(initialSource = "") {
       torrents = await invoke("snapshot");
       renderAll();
     } catch (e) {
+      btn.disabled = false;
+      btn.textContent = original;
       showToast("error", friendlyError(e));
     }
   };

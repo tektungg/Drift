@@ -76,11 +76,44 @@ async fn main() {
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+            let state_for_emit = state.clone();
             tokio::spawn(async move {
+                use drift::state::TorrentState;
+                use std::collections::HashMap;
+                let mut last_state_label: HashMap<String, String> = HashMap::new();
                 while let Ok(u) = rx.recv().await {
+                    let ih_str: String = u.infohash.as_str().into();
+
+                    // Look up display name and current persisted record from state.
+                    let snap = state_for_emit.snapshot();
+                    let rec_opt = snap.torrents.iter().find(|t| t.infohash == ih_str).cloned();
+                    let name = rec_opt.as_ref().map(|r| r.display_name.clone()).unwrap_or_default();
+
+                    // Persist state transitions so the sidebar counts reflect reality across restarts.
+                    let prev_emitted = last_state_label.get(&ih_str).cloned();
+                    if prev_emitted.as_deref() != Some(u.state_label.as_str()) {
+                        last_state_label.insert(ih_str.clone(), u.state_label.clone());
+                        if let Some(mut rec) = rec_opt {
+                            let new_state = match u.state_label.as_str() {
+                                "downloading" => Some(TorrentState::Downloading),
+                                "seeding"     => Some(TorrentState::Seeding),
+                                "paused"      => Some(TorrentState::Paused),
+                                "stalled"     => Some(TorrentState::Stalled),
+                                "completed"   => Some(TorrentState::Completed),
+                                _             => None, // initializing/error/etc. — don't persist
+                            };
+                            if let Some(s) = new_state {
+                                if rec.state != s {
+                                    rec.state = s;
+                                    let _ = state_for_emit.upsert(rec);
+                                }
+                            }
+                        }
+                    }
+
                     let dto = TorrentDto {
-                        infohash: u.infohash.as_str().into(),
-                        name: String::new(), // resolved on the frontend via snapshot
+                        infohash: ih_str,
+                        name,
                         downloaded: u.downloaded, total: u.total,
                         down_bps: u.down_bps, up_bps: u.up_bps,
                         peers: u.peers, state_label: u.state_label,
