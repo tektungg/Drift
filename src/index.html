@@ -1,5 +1,31 @@
 <!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>Drift</title></head>
-  <body><h1>Drift</h1></body>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Drift</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="titlebar">
+    <button class="win-btn" id="btn-min" title="Minimize"></button>
+    <button class="win-btn" id="btn-max" title="Maximize"></button>
+    <button class="win-btn" id="btn-close" title="Close"></button>
+    <div class="title">Drift</div>
+    <button class="btn-ghost" id="btn-settings" style="-webkit-app-region:no-drag">Settings</button>
+  </div>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main">
+      <div class="main-head">
+        <h1 id="main-title">All downloads</h1>
+        <button class="btn-primary" id="btn-add">+ Add torrent</button>
+      </div>
+      <div id="torrent-list"></div>
+    </main>
+  </div>
+  <div class="toast-stack" id="toasts"></div>
+  <div id="modal-root"></div>
+  <div class="settings-panel" id="settings-panel"></div>
+  <script type="module" src="main.js"></script>
+</body>
 </html>
