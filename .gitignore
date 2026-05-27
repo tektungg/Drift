@@ -23,3 +23,6 @@ src-tauri/gen/
 
 # Drift runtime data (should never live in repo)
 *.log
+
+# Integration test fixtures (drop real .torrent files here to run the test)
+src-tauri/tests/fixtures/*.torrent

@@ -3,6 +3,14 @@ name = "drift"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "drift"
+path = "src/lib.rs"
+
+[[bin]]
+name = "drift"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

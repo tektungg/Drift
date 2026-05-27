@@ -1,10 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod category;
-mod magnet;
-mod state;
-mod settings;
-mod engine;
+// Re-export from the library crate
+use drift as _;
 
 fn main() {
     tauri::Builder::default()
