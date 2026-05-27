@@ -26,6 +26,18 @@ async fn main() {
     let cfg0 = settings.get();
     engine.set_global_limits(cfg0.download_kbps, cfg0.upload_kbps);
 
+    // Resume previously persisted torrents (non-paused ones)
+    let snap = state.snapshot();
+    for r in &snap.torrents {
+        if matches!(r.state, drift::state::TorrentState::Paused) { continue; }
+        if let Err(e) = engine.resume_existing(
+            &drift::magnet::InfoHash(r.infohash.clone()),
+            &r.save_path,
+        ).await {
+            tracing::warn!("failed to resume {}: {e}", r.infohash);
+        }
+    }
+
     // Hold a clone of the engine for the progress-emit task; the ctx takes the other.
     let mut rx = engine.subscribe();
     let ctx = AppCtx { engine: engine.clone(), state: state.clone(), settings: settings.clone() };
