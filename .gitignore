@@ -5,7 +5,9 @@
 /target/
 /src-tauri/target/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock: commit for binary crates (reproducible builds).
+# Only ignore a hypothetical workspace-root lock; src-tauri/Cargo.lock is tracked.
+/Cargo.lock
 
 # Node / frontend tooling (if added later)
 node_modules/

@@ -24,8 +24,11 @@ pub fn install(app: &AppHandle) -> tauri::Result<TrayIcon> {
                 tauri::async_runtime::spawn(async move {
                     let ctx = handle.state::<crate::commands::AppCtx>();
                     let snap = ctx.state.snapshot();
-                    for r in snap.torrents {
-                        let _ = ctx.engine.pause(&crate::magnet::InfoHash(r.infohash)).await;
+                    for mut r in snap.torrents {
+                        if ctx.engine.pause(&crate::magnet::InfoHash(r.infohash.clone())).await.is_ok() {
+                            r.state = crate::state::TorrentState::Paused;
+                            let _ = ctx.state.upsert(r);
+                        }
                     }
                 });
             }

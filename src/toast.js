@@ -1,5 +1,5 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
-import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
+import { listen, emit } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
 import { getCurrentWindow } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/window.js";
 
 const win = getCurrentWindow();
@@ -19,7 +19,10 @@ document.getElementById("t-add").onclick = async () => {
   try {
     await invoke("add_torrent", { req: { source: pending.uri, overridePath: null, selectedFiles: null } });
   } catch (e) {
-    // failures are surfaced in the main window's toast stack via listen("toast")
+    // Surface the failure to the main window's toast stack
+    const s = String(e);
+    const message = s.includes("already_added") ? "Already in your list." : `Couldn't add torrent: ${s}`;
+    await emit("toast", { kind: "error", message });
   }
   pending = null;
   await win.hide();
