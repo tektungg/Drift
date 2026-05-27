@@ -75,8 +75,33 @@ function rowHtml(t) {
 }
 
 function renderExpanded(t) {
-  // Files list populated by `invoke("torrent_files", {ih})` in Task 12.
-  return `<div class="expanded-files" data-ih="${t.infohash}"><div class="file-row">Loading file list…</div></div>`;
+  const id = "exp-" + t.infohash;
+  setTimeout(async () => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    try {
+      const files = await invoke("torrent_files", { infohash: t.infohash });
+      el.innerHTML = files.map(f => {
+        const pct = f.size > 0 ? Math.floor(100 * f.downloaded / f.size) : 0;
+        return `<div class="file-row">
+          <label style="display:flex; gap:8px; align-items:center; flex:1;">
+            <input type="checkbox" data-i="${f.index}" ${f.selected ? "checked" : ""}>
+            <span>${escape(f.path)}</span>
+          </label>
+          <span>${pct}% · ${fmtBytes(f.size)}</span>
+        </div>`;
+      }).join("");
+      // Mid-download deselect: when any checkbox changes, send the new selection set
+      el.querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = async () => {
+        const sel = [...el.querySelectorAll("input[type=checkbox]:checked")].map(x => +x.dataset.i);
+        try { await invoke("set_file_selection", { infohash: t.infohash, selected: sel }); }
+        catch (e) { showToast("error", String(e)); cb.checked = !cb.checked; }
+      });
+    } catch (e) {
+      el.innerHTML = `<div class="file-row">Couldn't load files: ${e}</div>`;
+    }
+  }, 0);
+  return `<div class="expanded-files" id="${id}"><div class="file-row">Loading file list…</div></div>`;
 }
 
 function toggleExpand(ih) {

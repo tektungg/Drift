@@ -137,3 +137,19 @@ pub fn copy_magnet(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<()
     );
     clipboard_win::set_clipboard_string(&magnet).map_err(|e| format!("{e:?}"))
 }
+
+#[tauri::command]
+pub async fn torrent_files(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<serde_json::Value, String> {
+    let files = ctx.engine.files(&crate::magnet::InfoHash(infohash)).await.map_err(|e| e.to_string())?;
+    Ok(serde_json::to_value(files).unwrap())
+}
+
+#[tauri::command]
+pub async fn set_file_selection(ctx: tauri::State<'_, AppCtx>, infohash: String, selected: Vec<usize>) -> Result<(), String> {
+    ctx.engine.set_file_selection(&crate::magnet::InfoHash(infohash.clone()), &selected).await.map_err(|e| e.to_string())?;
+    if let Some(mut r) = ctx.state.snapshot().torrents.into_iter().find(|t| t.infohash == infohash) {
+        r.selected_files = Some(selected);
+        ctx.state.upsert(r).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}

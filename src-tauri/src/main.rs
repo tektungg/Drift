@@ -45,6 +45,8 @@ async fn main() {
             commands::set_settings,
             commands::open_folder,
             commands::copy_magnet,
+            commands::torrent_files,
+            commands::set_file_selection,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
