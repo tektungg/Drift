@@ -18,5 +18,8 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Tauri auto-generated (created by tauri-build at build time)
+src-tauri/gen/
+
 # Drift runtime data (should never live in repo)
 *.log
