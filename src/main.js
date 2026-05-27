@@ -1,15 +1,12 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
 import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
-import { getCurrentWindow } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/window.js";
 
 // NOTE: production builds should vendor these via npm + a bundler. For
 // development MVP, CDN imports keep the surface minimal. If CSP blocks them,
 // switch to: import {invoke} from "@tauri-apps/api/core" with a bundler.
-
-const win = getCurrentWindow();
-document.getElementById("btn-min").onclick = () => win.minimize();
-document.getElementById("btn-max").onclick = () => win.toggleMaximize();
-document.getElementById("btn-close").onclick = () => win.close();
+//
+// The window uses native Windows decorations (titlebar with min/max/close),
+// so we no longer wire those buttons from JS.
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -35,10 +32,13 @@ function renderSidebar() {
     <div class="side-item ${currentFilter === f.key ? 'active' : ''}" data-key="${f.key}">
       <span>${f.label}</span><span>${counts[f.key]}</span>
     </div>`).join("") +
-    `<div class="side-totals">
-      <div class="label">Total</div>
-      <div style="font-size:13px">↓ ${fmtBps(down)}</div>
-      <div style="font-size:11px;color:var(--ink-soft)">↑ ${fmtBps(up)}</div>
+    `<div class="side-bottom">
+      <div class="side-totals">
+        <div class="label">Total</div>
+        <div style="font-size:13px">↓ ${fmtBps(down)}</div>
+        <div style="font-size:11px;color:var(--ink-soft)">↑ ${fmtBps(up)}</div>
+      </div>
+      <div class="side-settings" id="side-settings">⚙  Settings</div>
     </div>`;
   el.querySelectorAll(".side-item").forEach(n => n.onclick = () => {
     currentFilter = n.dataset.key;
@@ -46,6 +46,7 @@ function renderSidebar() {
       FILTERS.find(x => x.key === currentFilter).label + " downloads";
     renderAll();
   });
+  el.querySelector("#side-settings").onclick = () => toggleSettings();
 }
 
 function renderList() {
@@ -134,7 +135,7 @@ window.drift = { renderAll };  // for console debugging
 
 // Wire up Add button (modal opens in Task 11)
 document.getElementById("btn-add").onclick = () => openAddDialog();
-document.getElementById("btn-settings").onclick = () => toggleSettings();
+// Settings is wired per-render from inside renderSidebar() (#side-settings).
 
 // Stubs filled by later tasks:
 async function openAddDialog(initialSource = "") {

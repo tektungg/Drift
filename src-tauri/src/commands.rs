@@ -36,6 +36,8 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
 
     let meta = ctx.engine.peek(&src).await.map_err(|e| e.to_string())?;
     if ctx.state.contains(meta.infohash.as_str()) {
+        // Clean up the list-only registration that peek leaves in the librqbit session.
+        let _ = ctx.engine.remove(&meta.infohash, false).await;
         return Err("already_added".into());
     }
 
@@ -45,6 +47,11 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
         None => Engine::pick_save_path(&cfg.download_root, &meta, &cfg.category_map.clone().into()),
     };
     std::fs::create_dir_all(&save_path).map_err(|e| e.to_string())?;
+
+    // peek added the torrent in list-only mode. librqbit returns AlreadyManaged on the
+    // subsequent start() with the real options (output folder, file selection), so the
+    // download never actually begins. Forget the list-only registration first.
+    let _ = ctx.engine.remove(&meta.infohash, false).await;
 
     let ih = ctx.engine.start(src, &save_path, req.selected_files.clone()).await.map_err(|e| e.to_string())?;
 
