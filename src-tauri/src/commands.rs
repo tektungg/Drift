@@ -113,7 +113,24 @@ pub fn get_settings(ctx: tauri::State<'_, AppCtx>) -> serde_json::Value {
 pub fn set_settings(ctx: tauri::State<'_, AppCtx>, value: serde_json::Value) -> Result<(), String> {
     let cfg: crate::settings::Config = serde_json::from_value(value).map_err(|e| e.to_string())?;
     ctx.engine.set_global_limits(cfg.download_kbps, cfg.upload_kbps);
+    crate::clipboard::ENABLED.store(cfg.clipboard_watch, std::sync::atomic::Ordering::Relaxed);
+    apply_startup_registration(cfg.start_with_windows).map_err(|e| e.to_string())?;
     ctx.settings.replace(cfg).map_err(|e| e.to_string())
+}
+
+fn apply_startup_registration(enable: bool) -> anyhow::Result<()> {
+    use std::process::Command;
+    let exe = std::env::current_exe()?.to_string_lossy().into_owned();
+    if enable {
+        Command::new("reg").args(["add",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v", "Drift", "/t", "REG_SZ", "/d", &exe, "/f"]).status()?;
+    } else {
+        let _ = Command::new("reg").args(["delete",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v", "Drift", "/f"]).status();
+    }
+    Ok(())
 }
 
 fn chrono_now_ms() -> i64 {

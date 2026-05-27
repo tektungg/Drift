@@ -208,7 +208,78 @@ async function openAddDialog(initialSource = "") {
 
   if (initialSource) refresh();
 }
-function toggleSettings() { /* Task 16 */ }
+async function toggleSettings() {
+  const panel = document.getElementById("settings-panel");
+  if (panel.classList.contains("open")) { panel.classList.remove("open"); return; }
+  const cfg = await invoke("get_settings");
+  panel.innerHTML = `
+    <h2 style="font-family:var(--font-serif); margin:0 0 18px; font-size:18px; font-weight:500">Settings</h2>
+
+    <div class="settings-field">
+      <label>Default download folder</label>
+      <input type="text" id="s-root" value="${escape(cfg.download_root)}">
+    </div>
+
+    <div class="settings-field">
+      <label>Download limit (KB/s, 0 = unlimited)</label>
+      <input type="text" id="s-down" value="${cfg.download_kbps}">
+    </div>
+    <div class="settings-field">
+      <label>Upload limit (KB/s, 0 = unlimited)</label>
+      <input type="text" id="s-up" value="${cfg.upload_kbps}">
+    </div>
+
+    <div class="settings-field">
+      <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0">
+        <input type="checkbox" id="s-clip" ${cfg.clipboard_watch ? "checked" : ""}>
+        Watch clipboard for magnet links
+      </label>
+    </div>
+    <div class="settings-field">
+      <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0">
+        <input type="checkbox" id="s-tray" ${cfg.close_to_tray ? "checked" : ""}>
+        Close button hides to tray
+      </label>
+    </div>
+    <div class="settings-field">
+      <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0">
+        <input type="checkbox" id="s-startup" ${cfg.start_with_windows ? "checked" : ""}>
+        Start with Windows
+      </label>
+    </div>
+
+    <details style="margin-top:18px">
+      <summary style="cursor:pointer; font-size:13px; color:var(--ink-soft)">Category extensions</summary>
+      ${["video","audio","documents","compressed","programs","images"].map(k => `
+        <div class="settings-field">
+          <label>${k}</label>
+          <input type="text" id="s-cat-${k}" value="${cfg.category_map[k].join(' ')}">
+        </div>`).join("")}
+    </details>
+
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px">
+      <button class="btn-ghost" id="s-cancel">Close</button>
+      <button class="btn-primary" id="s-save">Save</button>
+    </div>`;
+  panel.classList.add("open");
+
+  document.getElementById("s-cancel").onclick = () => panel.classList.remove("open");
+  document.getElementById("s-save").onclick = async () => {
+    const value = {
+      download_root: document.getElementById("s-root").value,
+      download_kbps: +document.getElementById("s-down").value || 0,
+      upload_kbps: +document.getElementById("s-up").value || 0,
+      clipboard_watch: document.getElementById("s-clip").checked,
+      close_to_tray: document.getElementById("s-tray").checked,
+      start_with_windows: document.getElementById("s-startup").checked,
+      category_map: Object.fromEntries(
+        ["video","audio","documents","compressed","programs","images"].map(k =>
+          [k, document.getElementById("s-cat-"+k).value.split(/\s+/).filter(Boolean)])),
+    };
+    try { await invoke("set_settings", { value }); panel.classList.remove("open"); showToast("info", "Settings saved."); }
+    catch (e) { showToast("error", String(e)); }
+  };
+}
 
 function openContextMenu(ih, x, y) {
   closeContextMenu();
