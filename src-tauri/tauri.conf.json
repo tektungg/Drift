@@ -48,6 +48,11 @@
   "bundle": {
     "active": true,
     "targets": ["msi", "nsis"],
-    "icon": ["icons/icon.ico", "icons/icon.png"]
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    }
   }
 }
