@@ -28,13 +28,20 @@ pub async fn snapshot(ctx: tauri::State<'_, AppCtx>) -> Result<Vec<TorrentDto>, 
     }).collect())
 }
 
+/// Max time we'll wait for librqbit to resolve magnet metadata from peers
+/// before reporting the user-friendly "metadata_timeout" error.
+const PEEK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
 #[tauri::command]
 pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Result<String, String> {
     let src = if req.source.starts_with("magnet:?") {
         Source::Magnet(req.source.clone())
     } else { Source::TorrentFile(PathBuf::from(&req.source)) };
 
-    let meta = ctx.engine.peek(&src).await.map_err(|e| e.to_string())?;
+    let meta = tokio::time::timeout(PEEK_TIMEOUT, ctx.engine.peek(&src))
+        .await
+        .map_err(|_| "metadata_timeout".to_string())?
+        .map_err(|e| e.to_string())?;
     if ctx.state.contains(meta.infohash.as_str()) {
         // Clean up the list-only registration that peek leaves in the librqbit session.
         let _ = ctx.engine.remove(&meta.infohash, false).await;
@@ -100,8 +107,13 @@ pub async fn resume(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(
 
 #[tauri::command]
 pub async fn remove(ctx: tauri::State<'_, AppCtx>, infohash: String, delete_files: bool) -> Result<(), String> {
-    ctx.engine.remove(&InfoHash(infohash.clone()), delete_files).await.map_err(|e| e.to_string())?;
-    ctx.state.remove(&infohash).map_err(|e| e.to_string())
+    // Always clean state.json — even if the engine layer fails, we don't want a
+    // ghost row that the user can never remove. State is the source of truth for
+    // the UI; engine is just the runtime.
+    let engine_result = ctx.engine.remove(&InfoHash(infohash.clone()), delete_files).await;
+    let state_result = ctx.state.remove(&infohash);
+    engine_result.map_err(|e| e.to_string())?;
+    state_result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -109,7 +121,10 @@ pub async fn peek(ctx: tauri::State<'_, AppCtx>, source: String) -> Result<serde
     let src = if source.starts_with("magnet:?") {
         Source::Magnet(source.clone())
     } else { Source::TorrentFile(PathBuf::from(&source)) };
-    let m = ctx.engine.peek(&src).await.map_err(|e| e.to_string())?;
+    let m = tokio::time::timeout(PEEK_TIMEOUT, ctx.engine.peek(&src))
+        .await
+        .map_err(|_| "metadata_timeout".to_string())?
+        .map_err(|e| e.to_string())?;
     let cfg = ctx.settings.get();
 
     // Mirror add_torrent's path resolution so the dialog shows the actual destination.

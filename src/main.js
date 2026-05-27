@@ -1,6 +1,5 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
 import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
-import { getCurrentWindow } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/window.js";
 
 // NOTE: production builds should vendor these via npm + a bundler. For
 // development MVP, CDN imports keep the surface minimal. If CSP blocks them,
@@ -136,6 +135,7 @@ function friendlyError(e) {
   const s = String(e);
   if (s.includes("already_added")) return "Already in your list.";
   if (s.includes("select_at_least_one")) return "Pick at least one file — to stop downloading entirely, remove the torrent.";
+  if (s.includes("metadata_timeout")) return "Couldn't fetch metadata in 60s — too few seeds or no network.";
   if (s.toLowerCase().includes("not a magnet")) return "Couldn't read this torrent.";
   if (s.includes("os error 112") || s.toLowerCase().includes("no space")) return "Disk full — torrent paused.";
   if (s.toLowerCase().includes("permission denied")) return "Write permission denied — torrent paused.";
@@ -220,6 +220,12 @@ async function openAddDialog(initialSource = "") {
   // for 500ms. Never on blur — clicking Add or dragging the window must not retrigger.
   ta.addEventListener("paste", () => setTimeout(refresh, 0));
   ta.addEventListener("input", () => {
+    // The source changed; any cached metadata is no longer valid. Disable Add
+    // until refresh() completes so the user can't fire add_torrent with stale
+    // file selections that don't match the new torrent.
+    lastMeta = null;
+    selected = null;
+    btn.disabled = true;
     clearTimeout(fetchTimer);
     fetchTimer = setTimeout(refresh, 500);
   });
@@ -328,20 +334,34 @@ function openContextMenu(ih, x, y) {
   menu.className = "context-menu";
   menu.style.left = x + "px";
   menu.style.top = y + "px";
+  // Each item has: label, fn (the async action), and onSuccess (optional
+  // user-visible feedback after the action completes).
   const items = [
     t.state_label === "paused"
       ? { label: "Resume", fn: () => invoke("resume", { infohash: ih }) }
       : { label: "Pause",  fn: () => invoke("pause",  { infohash: ih }) },
     { label: "Open folder", fn: () => invoke("open_folder", { infohash: ih }) },
-    { label: "Copy magnet", fn: () => invoke("copy_magnet", { infohash: ih }) },
+    { label: "Copy magnet",
+      fn: () => invoke("copy_magnet", { infohash: ih }),
+      onSuccess: () => showToast("info", "Magnet copied to clipboard.") },
     { label: "Remove", fn: () => invoke("remove", { infohash: ih, deleteFiles: false }) },
     { label: "Remove + delete files", fn: () => invoke("remove", { infohash: ih, deleteFiles: true }) },
   ];
-  menu.innerHTML = items.map((it, i) => `<div class="item" data-i="${i}">${it.label}</div>`).join("");
+  menu.innerHTML = items.map((it, i) => `<div class="item" data-i="${i}">${escape(it.label)}</div>`).join("");
   document.body.appendChild(menu);
   menu.querySelectorAll(".item").forEach(n => n.onclick = async () => {
-    try { await items[+n.dataset.i].fn(); } catch (e) { showToast("error", friendlyError(e)); }
+    const item = items[+n.dataset.i];
     closeContextMenu();
+    try {
+      await item.fn();
+      if (item.onSuccess) item.onSuccess();
+      // Always re-sync from the backend after a context action so that
+      // removed rows disappear immediately and paused/resumed states show.
+      torrents = await invoke("snapshot");
+      renderAll();
+    } catch (e) {
+      showToast("error", friendlyError(e));
+    }
   });
   document.addEventListener("click", closeContextMenu, { once: true });
 }
@@ -381,12 +401,16 @@ listen("open-source", (e) => openAddDialog(e.payload));
 })();
 
 // Drag-drop on the whole window.
-// Tauri 2 intercepts native OS file drops at the window level — the HTML5 `drop`
-// event NEVER fires with a usable file.path for external drags. We must use
-// Tauri's onDragDropEvent, which yields the absolute path(s) of the dropped files.
-getCurrentWindow().onDragDropEvent((event) => {
-  if (event.payload.type !== "drop") return;
-  const path = event.payload.paths?.find(p => /\.torrent$/i.test(p)) ?? event.payload.paths?.[0];
-  if (!path) return;
-  openAddDialog(path);
+//
+// Tauri 2 intercepts native OS file drops at the window level — HTML5
+// `drop` events NEVER fire with a usable path for external file drags.
+// The `Window.onDragDropEvent()` helper isn't reliably exposed via the
+// CDN'd window module in every Tauri 2 minor version, so subscribe to
+// the raw Tauri event instead. This works regardless of which binding
+// version the CDN happens to ship.
+listen("tauri://drag-drop", (event) => {
+  const paths = event.payload?.paths;
+  if (!paths || paths.length === 0) return;
+  const torrentPath = paths.find(p => /\.torrent$/i.test(p)) ?? paths[0];
+  openAddDialog(torrentPath);
 });

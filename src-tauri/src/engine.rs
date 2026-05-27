@@ -212,10 +212,20 @@ impl Engine {
             iter.map(|(_, handle)| {
                 let ih_str = handle.info_hash().as_string();
                 let stats = handle.stats();
-                let downloaded = stats.progress_bytes;
                 let total = stats.total_bytes;
 
-                // Speed figures are only available when the torrent is live.
+                // librqbit's `stats.progress_bytes` is sometimes 0 even when every
+                // file's per-file progress is at 100% — typically when the data
+                // already existed on disk and the torrent was resumed without a
+                // fresh streaming-update cycle. Derive the aggregate from the
+                // per-file progress array and take the larger of the two so we
+                // always report the most accurate number.
+                let file_sum: u64 = stats.file_progress.iter().copied().sum();
+                let downloaded = stats.progress_bytes.max(file_sum);
+
+                // Same defensive treatment for `finished`: librqbit's flag can lag.
+                let finished = stats.finished || (total > 0 && downloaded >= total);
+
                 let (down_bps, up_bps, peers) = stats
                     .live
                     .as_ref()
@@ -231,7 +241,7 @@ impl Engine {
 
                 let raw_state = format!("{}", stats.state);
 
-                (ih_str, downloaded, total, down_bps, up_bps, peers, raw_state, stats.finished)
+                (ih_str, downloaded, total, down_bps, up_bps, peers, raw_state, finished)
             })
             .collect::<Vec<_>>()
         });
@@ -399,15 +409,37 @@ impl Engine {
 
     /// Remove a torrent from the session.  Pass `delete_files = true` to also
     /// delete the downloaded data from disk.
+    ///
+    /// Idempotent: if the torrent isn't currently in the session (e.g. already
+    /// removed, or never added), returns `Ok(())` so callers can repeat the
+    /// action without surfacing spurious errors.
     pub async fn remove(&self, ih: &InfoHash, delete_files: bool) -> Result<()> {
         let id20 = Self::to_id20(ih)?;
-        self.session()
-            .delete(
-                librqbit::api::TorrentIdOrHash::Hash(id20),
-                delete_files,
-            )
+        // Pre-check: don't even ask librqbit to delete something it doesn't have.
+        if self
+            .session()
+            .get(librqbit::api::TorrentIdOrHash::Hash(id20))
+            .is_none()
+        {
+            return Ok(());
+        }
+        match self
+            .session()
+            .delete(librqbit::api::TorrentIdOrHash::Hash(id20), delete_files)
             .await
-            .context("error removing torrent")
+        {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // Race: torrent disappeared between the `get` and `delete`. Swallow
+                // "not found"-style failures; surface anything else.
+                let s = format!("{e}").to_lowercase();
+                if s.contains("not found") || s.contains("does not exist") || s.contains("no such") {
+                    Ok(())
+                } else {
+                    Err(e).context("error removing torrent")
+                }
+            }
+        }
     }
 
     /// Set session-level rate limits.  Pass `0` for unlimited.
