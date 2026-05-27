@@ -249,6 +249,9 @@ function showToast(kind, message) {
 // listen for toast events from Rust
 listen("toast", (e) => showToast(e.payload.kind, e.payload.message));
 
+// Single-instance: second launch forwards magnet/torrent to open the Add dialog
+listen("open-source", (e) => openAddDialog(e.payload));
+
 // Boot: load current snapshot from Rust + subscribe to events
 (async () => {
   try {

@@ -31,6 +31,20 @@ async fn main() {
     let ctx = AppCtx { engine: engine.clone(), state: state.clone(), settings: settings.clone() };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // Existing instance receives the launched argv
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+            // Forward magnet/torrent arg to frontend
+            for arg in argv.iter().skip(1) {
+                if arg.starts_with("magnet:?") || arg.ends_with(".torrent") {
+                    let _ = app.emit("open-source", arg.clone());
+                    break;
+                }
+            }
+        }))
         .manage(ctx)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -80,6 +94,20 @@ async fn main() {
 
             // Install system tray
             drift::tray::install(app.handle())?;
+
+            // Cold-start: if launched with a magnet/torrent arg, emit it after the window is ready
+            let argv: Vec<String> = std::env::args().collect();
+            for arg in argv.iter().skip(1) {
+                if arg.starts_with("magnet:?") || arg.ends_with(".torrent") {
+                    let handle = app.handle().clone();
+                    let payload = arg.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                        let _ = handle.emit("open-source", payload);
+                    });
+                    break;
+                }
+            }
 
             Ok(())
         })
