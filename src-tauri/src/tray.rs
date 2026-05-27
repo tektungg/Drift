@@ -1,6 +1,6 @@
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::{TrayIcon, TrayIconBuilder},
+    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, Wry,
 };
 
@@ -35,8 +35,20 @@ pub fn install(app: &AppHandle) -> tauri::Result<TrayIcon> {
             "quit" => app.exit(0),
             _ => {}
         })
-        .on_tray_icon_event(|tray, _ev| {
-            // Toggle main window visibility on tray click
+        .on_tray_icon_event(|tray, ev| {
+            // Only toggle on a real left-click release. Without this filter, Tauri's
+            // Enter/Move/Leave events would flicker the window every time the user's
+            // cursor passes over the tray icon.
+            if !matches!(
+                ev,
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                }
+            ) {
+                return;
+            }
             if let Some(w) = tray.app_handle().get_webview_window("main") {
                 if w.is_visible().unwrap_or(false) {
                     let _ = w.hide();

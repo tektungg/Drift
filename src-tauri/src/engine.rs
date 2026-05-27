@@ -238,23 +238,27 @@ impl Engine {
 
         let now = Instant::now();
         for (ih_str, downloaded, total, down_bps, up_bps, peers, raw_state, finished) in updates {
-            // Stall detection: if "live" but bytes haven't moved for 30 s.
-            let state_label = if raw_state == "live" {
-                if finished {
-                    "seeding".to_owned()
+            // Determine the user-visible state label.
+            //
+            //   finished + live      → "seeding"   (done, actively sharing)
+            //   finished + !live     → "completed" (done, paused or otherwise quiet)
+            //   !finished + live     → "downloading" or "stalled" (30s no progress)
+            //   !finished + !live    → librqbit's raw state (paused/initializing/error/…)
+            let state_label = if finished {
+                stall_map.remove(&ih_str);
+                if raw_state == "live" { "seeding".to_owned() } else { "completed".to_owned() }
+            } else if raw_state == "live" {
+                let entry = stall_map
+                    .entry(ih_str.clone())
+                    .or_insert((downloaded, now));
+                if downloaded > entry.0 {
+                    *entry = (downloaded, now);
+                }
+                let stall_duration = now.duration_since(entry.1);
+                if stall_duration >= Duration::from_secs(30) {
+                    "stalled".to_owned()
                 } else {
-                    let entry = stall_map
-                        .entry(ih_str.clone())
-                        .or_insert((downloaded, now));
-                    if downloaded > entry.0 {
-                        *entry = (downloaded, now);
-                    }
-                    let stall_duration = now.duration_since(entry.1);
-                    if stall_duration >= Duration::from_secs(30) {
-                        "stalled".to_owned()
-                    } else {
-                        "downloading".to_owned()
-                    }
+                    "downloading".to_owned()
                 }
             } else {
                 // Remove stall tracking for non-live torrents.

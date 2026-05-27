@@ -1,5 +1,6 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
 import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
+import { getCurrentWindow } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/window.js";
 
 // NOTE: production builds should vendor these via npm + a bundler. For
 // development MVP, CDN imports keep the surface minimal. If CSP blocks them,
@@ -119,11 +120,22 @@ function fmtBytes(n) {
   return `${v.toFixed(v < 10 ? 2 : 1)} ${units[i]}`;
 }
 function fmtBps(n) { return `${fmtBytes(n)}/s`; }
-function escape(s) { const d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+// HTML-escape for BOTH body content AND attribute values. textContent->innerHTML
+// only escapes &, <, > — leaving " and ' intact, which would break out of
+// `value="${escape(x)}"` attribute contexts. Add explicit quote escaping.
+function escape(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function friendlyError(e) {
   const s = String(e);
   if (s.includes("already_added")) return "Already in your list.";
+  if (s.includes("select_at_least_one")) return "Pick at least one file — to stop downloading entirely, remove the torrent.";
   if (s.toLowerCase().includes("not a magnet")) return "Couldn't read this torrent.";
   if (s.includes("os error 112") || s.toLowerCase().includes("no space")) return "Disk full — torrent paused.";
   if (s.toLowerCase().includes("permission denied")) return "Write permission denied — torrent paused.";
@@ -176,7 +188,7 @@ async function openAddDialog(initialSource = "") {
       renderMeta();
       btn.disabled = false;
     } catch (e) {
-      meta.textContent = "Couldn't read this torrent: " + e;
+      meta.textContent = friendlyError(e);
       lastFetched = "";  // allow retry on the same string after a failure
     }
   }
@@ -310,7 +322,7 @@ async function toggleSettings() {
 
 function openContextMenu(ih, x, y) {
   closeContextMenu();
-  const t = torrents.find(x => x.infohash === ih);
+  const t = torrents.find(it => it.infohash === ih);
   if (!t) return;
   const menu = document.createElement("div");
   menu.className = "context-menu";
@@ -368,13 +380,13 @@ listen("open-source", (e) => openAddDialog(e.payload));
   });
 })();
 
-// Drag-drop on the whole window
-document.addEventListener("dragover", e => e.preventDefault());
-document.addEventListener("drop", async e => {
-  e.preventDefault();
-  const file = e.dataTransfer?.files?.[0];
-  if (!file) return;
-  // Tauri provides the file path on drop; use it directly:
-  const path = file.path || file.name;
+// Drag-drop on the whole window.
+// Tauri 2 intercepts native OS file drops at the window level — the HTML5 `drop`
+// event NEVER fires with a usable file.path for external drags. We must use
+// Tauri's onDragDropEvent, which yields the absolute path(s) of the dropped files.
+getCurrentWindow().onDragDropEvent((event) => {
+  if (event.payload.type !== "drop") return;
+  const path = event.payload.paths?.find(p => /\.torrent$/i.test(p)) ?? event.payload.paths?.[0];
+  if (!path) return;
   openAddDialog(path);
 });

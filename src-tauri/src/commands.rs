@@ -111,14 +111,29 @@ pub async fn peek(ctx: tauri::State<'_, AppCtx>, source: String) -> Result<serde
     } else { Source::TorrentFile(PathBuf::from(&source)) };
     let m = ctx.engine.peek(&src).await.map_err(|e| e.to_string())?;
     let cfg = ctx.settings.get();
-    let predicted = Engine::pick_save_path(&cfg.download_root, &m, &cfg.category_map.clone().into());
-    Ok(serde_json::json!({
+
+    // Mirror add_torrent's path resolution so the dialog shows the actual destination.
+    let category_dir = Engine::pick_save_path(&cfg.download_root, &m, &cfg.category_map.clone().into());
+    let predicted = if needs_name_wrap(&m.files) {
+        category_dir.join(sanitize_for_windows(&m.name))
+    } else {
+        category_dir
+    };
+
+    let json = serde_json::json!({
         "infohash": m.infohash.as_str(),
         "name": m.name,
         "total_size": m.total_size,
         "files": m.files.iter().map(|f| serde_json::json!({"path": f.path, "size": f.size})).collect::<Vec<_>>(),
         "predicted_save_path": predicted,
-    }))
+    });
+
+    // peek registered the torrent in librqbit's session as list-only. Forget it now so
+    // we don't accumulate stale entries as the user types/pastes different magnets.
+    // add_torrent does its own peek+forget+start dance and is unaffected.
+    let _ = ctx.engine.remove(&m.infohash, false).await;
+
+    Ok(json)
 }
 
 #[tauri::command]
@@ -129,10 +144,21 @@ pub fn get_settings(ctx: tauri::State<'_, AppCtx>) -> serde_json::Value {
 #[tauri::command]
 pub fn set_settings(ctx: tauri::State<'_, AppCtx>, value: serde_json::Value) -> Result<(), String> {
     let cfg: crate::settings::Config = serde_json::from_value(value).map_err(|e| e.to_string())?;
+
+    // Apply the fallible side-effect (registry write) first. If it fails, no UI/runtime
+    // state has been mutated yet, so the user can see the error and try again cleanly.
+    apply_startup_registration(cfg.start_with_windows).map_err(|e| e.to_string())?;
+
+    // Then persist to disk (also fallible). If this fails we've registered the Run key but
+    // the saved config doesn't reflect it — minor inconsistency, but the next save will
+    // converge.
+    ctx.settings.replace(cfg.clone()).map_err(|e| e.to_string())?;
+
+    // Finally apply the in-memory side-effects, which can't fail.
     ctx.engine.set_global_limits(cfg.download_kbps, cfg.upload_kbps);
     crate::clipboard::ENABLED.store(cfg.clipboard_watch, std::sync::atomic::Ordering::Relaxed);
-    apply_startup_registration(cfg.start_with_windows).map_err(|e| e.to_string())?;
-    ctx.settings.replace(cfg).map_err(|e| e.to_string())
+
+    Ok(())
 }
 
 fn apply_startup_registration(enable: bool) -> anyhow::Result<()> {
@@ -244,6 +270,11 @@ pub async fn torrent_files(ctx: tauri::State<'_, AppCtx>, infohash: String) -> R
 
 #[tauri::command]
 pub async fn set_file_selection(ctx: tauri::State<'_, AppCtx>, infohash: String, selected: Vec<usize>) -> Result<(), String> {
+    if selected.is_empty() {
+        // Deselecting every file would either error in librqbit or silently freeze the
+        // torrent. Make the user explicitly remove it instead.
+        return Err("select_at_least_one".into());
+    }
     ctx.engine.set_file_selection(&crate::magnet::InfoHash(infohash.clone()), &selected).await.map_err(|e| e.to_string())?;
     if let Some(mut r) = ctx.state.snapshot().torrents.into_iter().find(|t| t.infohash == infohash) {
         r.selected_files = Some(selected);
