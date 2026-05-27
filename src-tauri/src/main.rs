@@ -6,7 +6,7 @@ use drift::events::TorrentDto;
 use drift::settings::SettingsStore;
 use drift::state::StateStore;
 use std::sync::Arc;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 fn app_data_dir() -> std::path::PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -62,6 +62,25 @@ async fn main() {
                     let _ = handle.emit("progress", dto);
                 }
             });
+
+            // Close button → hide to tray (if enabled in settings)
+            let main_window = app.get_webview_window("main").unwrap();
+            let settings_for_close = settings.clone();
+            let app_handle_for_close = app.handle().clone();
+            main_window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if settings_for_close.get().close_to_tray {
+                        api.prevent_close();
+                        if let Some(w) = app_handle_for_close.get_webview_window("main") {
+                            let _ = w.hide();
+                        }
+                    }
+                }
+            });
+
+            // Install system tray
+            drift::tray::install(app.handle())?;
+
             Ok(())
         })
         .run(tauri::generate_context!())
