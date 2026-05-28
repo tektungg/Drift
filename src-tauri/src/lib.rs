@@ -7,3 +7,4 @@ pub mod commands;
 pub mod events;
 pub mod tray;
 pub mod clipboard;
+pub mod queue;
