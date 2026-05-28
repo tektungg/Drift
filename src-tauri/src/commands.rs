@@ -51,17 +51,7 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
     let cfg = ctx.settings.get();
     let save_path = match req.override_path {
         Some(p) => PathBuf::from(p),
-        None => {
-            let mut p = Engine::pick_save_path(&cfg.download_root, &meta, &cfg.category_map.clone().into());
-            // Many torrents (e.g. FitGirl repacks) ship file lists with no shared top-level
-            // folder — every entry is a bare filename. librqbit would drop these straight into
-            // the category dir, polluting it. Wrap such "flat" multi-file torrents in a folder
-            // named after the torrent itself.
-            if needs_name_wrap(&meta.files) {
-                p = p.join(sanitize_for_windows(&meta.name));
-            }
-            p
-        }
+        None => decide_save_path(&cfg.download_root, &meta, &cfg.category_map.clone().into()),
     };
     std::fs::create_dir_all(&save_path).map_err(|e| e.to_string())?;
 
@@ -128,12 +118,7 @@ pub async fn peek(ctx: tauri::State<'_, AppCtx>, source: String) -> Result<serde
     let cfg = ctx.settings.get();
 
     // Mirror add_torrent's path resolution so the dialog shows the actual destination.
-    let category_dir = Engine::pick_save_path(&cfg.download_root, &m, &cfg.category_map.clone().into());
-    let predicted = if needs_name_wrap(&m.files) {
-        category_dir.join(sanitize_for_windows(&m.name))
-    } else {
-        category_dir
-    };
+    let predicted = decide_save_path(&cfg.download_root, &m, &cfg.category_map.clone().into());
 
     let json = serde_json::json!({
         "infohash": m.infohash.as_str(),
@@ -195,18 +180,76 @@ fn chrono_now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
 
-/// Returns true when a multi-file torrent's entries do NOT share a single
-/// top-level directory, meaning librqbit would drop them straight into the
-/// destination dir. Wrapping in the torrent's name folder fixes that.
-fn needs_name_wrap(files: &[crate::category::FileEntry]) -> bool {
-    if files.len() <= 1 { return false; }
-    fn first_seg(p: &str) -> Option<&str> {
-        p.split(['/', '\\']).find(|s| !s.is_empty())
+/// Decide where a torrent should land on disk.
+///
+/// Rules:
+///   * **Single file** → goes directly into the matching category folder
+///     (`movie.mkv` → `<root>/Video/movie.mkv`).
+///   * **Flat multi-file** (no internal folders) → category folder for the
+///     largest file's type, wrapped in a folder named after the torrent
+///     (e.g. an album of FLACs → `<root>/Audio/AlbumName/01.flac`; a flat
+///     FitGirl repack → `<root>/Other/<name>/fg-01.bin`).
+///   * **Has internal folders** → the torrent IS a folder (project, game,
+///     codebase, structured release). Goes into `Other/`, regardless of
+///     what file extensions are inside, because category routing is meant
+///     for loose media items, not packaged content.
+///
+/// If the torrent already contains its own top-level wrapping folder (every
+/// file shares the same first path segment AND has nesting beyond it), we
+/// do NOT add another wrap on top of librqbit's natural placement.
+fn decide_save_path(
+    root: &std::path::Path,
+    meta: &crate::engine::TorrentMetadata,
+    map: &crate::category::CategoryMap,
+) -> PathBuf {
+    use crate::category::Category;
+
+    let category = if has_internal_folders(&meta.files) {
+        Category::Other
+    } else {
+        crate::category::resolve(&meta.files, map)
+    };
+
+    let category_dir = root.join(category.folder_name());
+
+    if meta.files.len() <= 1 {
+        // Single file: place it directly in the category folder.
+        category_dir
+    } else if already_has_top_level_folder(&meta.files) {
+        // The torrent's file paths already include a shared wrapping
+        // directory; let librqbit use that as-is.
+        category_dir
+    } else {
+        // Flat or mixed multi-file: wrap in a folder named after the torrent.
+        category_dir.join(sanitize_for_windows(&meta.name))
     }
-    let Some(first) = first_seg(&files[0].path) else { return true; };
-    // If any file's first segment differs (or is missing), there is no shared
-    // top-level folder — wrap.
-    !files.iter().all(|f| first_seg(&f.path) == Some(first))
+}
+
+/// True if any file path contains a directory separator — i.e. the torrent
+/// has internal folder structure.
+fn has_internal_folders(files: &[crate::category::FileEntry]) -> bool {
+    files.iter().any(|f| f.path.contains('/') || f.path.contains('\\'))
+}
+
+/// True when every file shares the same non-empty first path segment AND
+/// each path has at least one component beyond it. That means the torrent
+/// already provides its own wrapping folder; we shouldn't add another.
+fn already_has_top_level_folder(files: &[crate::category::FileEntry]) -> bool {
+    if files.len() <= 1 {
+        return false;
+    }
+    fn parts(p: &str) -> Vec<&str> {
+        p.split(['/', '\\']).filter(|s| !s.is_empty()).collect()
+    }
+    let first_parts = parts(&files[0].path);
+    let Some(first) = first_parts.first().copied() else { return false; };
+    if first_parts.len() < 2 {
+        return false;
+    }
+    files.iter().all(|f| {
+        let ps = parts(&f.path);
+        ps.first().copied() == Some(first) && ps.len() >= 2
+    })
 }
 
 /// Replace characters that are illegal in Windows filenames with `_`, and
@@ -225,26 +268,133 @@ fn sanitize_for_windows(name: &str) -> String {
 #[cfg(test)]
 mod helper_tests {
     use super::*;
-    use crate::category::FileEntry;
+    use crate::category::{Category, CategoryMap, FileEntry};
+    use crate::engine::TorrentMetadata;
+    use crate::magnet::InfoHash;
 
-    fn f(p: &str) -> FileEntry { FileEntry { path: p.into(), size: 1 } }
+    fn f(p: &str, size: u64) -> FileEntry { FileEntry { path: p.into(), size } }
+
+    fn meta(name: &str, files: Vec<FileEntry>) -> TorrentMetadata {
+        let total = files.iter().map(|f| f.size).sum();
+        TorrentMetadata {
+            infohash: InfoHash("0".repeat(40)),
+            name: name.into(),
+            total_size: total,
+            files,
+        }
+    }
+
+    // --- has_internal_folders ---
 
     #[test]
-    fn single_file_no_wrap() {
-        assert!(!needs_name_wrap(&[f("movie.mkv")]));
+    fn flat_files_have_no_internal_folders() {
+        assert!(!has_internal_folders(&[f("a.bin", 1), f("b.bin", 1)]));
     }
     #[test]
-    fn multi_file_shared_prefix_no_wrap() {
-        assert!(!needs_name_wrap(&[f("Release/movie.mkv"), f("Release/subs.srt")]));
+    fn nested_paths_have_internal_folders() {
+        assert!(has_internal_folders(&[f("sub/a.bin", 1)]));
+        assert!(has_internal_folders(&[f("sub\\a.bin", 1)]));
     }
     #[test]
-    fn multi_file_flat_wraps() {
-        assert!(needs_name_wrap(&[f("fg-01.bin"), f("fg-02.bin"), f("fg-03.bin")]));
+    fn mixed_flat_and_nested_have_internal_folders() {
+        assert!(has_internal_folders(&[f("a.bin", 1), f("sub/b.bin", 1)]));
+    }
+
+    // --- already_has_top_level_folder ---
+
+    #[test]
+    fn single_file_has_no_top_level_folder() {
+        assert!(!already_has_top_level_folder(&[f("a.bin", 1)]));
     }
     #[test]
-    fn multi_file_mixed_prefixes_wraps() {
-        assert!(needs_name_wrap(&[f("a/x.bin"), f("b/y.bin")]));
+    fn flat_multi_file_has_no_top_level_folder() {
+        assert!(!already_has_top_level_folder(&[f("a.bin", 1), f("b.bin", 1)]));
     }
+    #[test]
+    fn fully_wrapped_torrent_has_top_level_folder() {
+        assert!(already_has_top_level_folder(&[
+            f("MyRelease/a.bin", 1),
+            f("MyRelease/b.bin", 1),
+        ]));
+    }
+    #[test]
+    fn partially_wrapped_torrent_does_not_count_as_already_wrapped() {
+        // test_folder case: some files inside images/ but README at root.
+        assert!(!already_has_top_level_folder(&[
+            f("images/a.jpg", 1),
+            f("images/b.jpg", 1),
+            f("README", 1),
+        ]));
+    }
+
+    // --- decide_save_path ---
+
+    #[test]
+    fn single_video_file_goes_to_video_no_wrap() {
+        let map = CategoryMap::default();
+        let m = meta("Some.Movie", vec![f("Some.Movie.mkv", 100)]);
+        let p = decide_save_path(std::path::Path::new("C:/D"), &m, &map);
+        assert_eq!(p, std::path::PathBuf::from("C:/D/Video"));
+    }
+
+    #[test]
+    fn flat_audio_album_goes_to_audio_wrapped() {
+        let map = CategoryMap::default();
+        let m = meta("MyAlbum", vec![
+            f("01.flac", 100), f("02.flac", 100), f("03.flac", 100),
+        ]);
+        let p = decide_save_path(std::path::Path::new("C:/D"), &m, &map);
+        assert_eq!(p, std::path::PathBuf::from("C:/D/Audio/MyAlbum"));
+    }
+
+    #[test]
+    fn flat_unknown_extension_goes_to_other_wrapped() {
+        // FitGirl-style flat .bin repack
+        let map = CategoryMap::default();
+        let m = meta("Big Game", vec![f("fg-01.bin", 100), f("fg-02.bin", 100)]);
+        let p = decide_save_path(std::path::Path::new("C:/D"), &m, &map);
+        assert_eq!(p, std::path::PathBuf::from("C:/D/Other/Big Game"));
+    }
+
+    #[test]
+    fn torrent_with_internal_folders_goes_to_other_even_if_media() {
+        // test_folder case: contains "images/" prefix -> internal folders -> Other
+        let map = CategoryMap::default();
+        let m = meta("test_folder", vec![
+            f("images/a.jpg", 100),
+            f("images/b.jpg", 100),
+            f("README", 50),
+        ]);
+        let p = decide_save_path(std::path::Path::new("C:/D"), &m, &map);
+        assert_eq!(p, std::path::PathBuf::from("C:/D/Other/test_folder"));
+    }
+
+    #[test]
+    fn fully_wrapped_torrent_does_not_double_wrap() {
+        // Movie release inside its own folder — files all share the wrap.
+        let map = CategoryMap::default();
+        let m = meta("MovieRelease", vec![
+            f("MovieRelease/movie.mkv", 1000),
+            f("MovieRelease/subs.srt", 10),
+        ]);
+        let p = decide_save_path(std::path::Path::new("C:/D"), &m, &map);
+        // Internal folders -> Other, but already wrapped -> no extra wrap layer.
+        assert_eq!(p, std::path::PathBuf::from("C:/D/Other"));
+    }
+
+    #[test]
+    fn empty_file_list_falls_through_to_other() {
+        let map = CategoryMap::default();
+        let m = meta("Nothing", vec![]);
+        let p = decide_save_path(std::path::Path::new("C:/D"), &m, &map);
+        // Empty file list: single-file path, category::resolve returns Other.
+        assert_eq!(p, std::path::PathBuf::from("C:/D/Other"));
+        // Make compiler happy about the unused Category import.
+        let _ = Category::Other;
+    }
+
+    // --- sanitize_for_windows ---
+
     #[test]
     fn sanitize_strips_illegal_chars() {
         assert_eq!(sanitize_for_windows("Foo: Bar/Baz?"), "Foo_ Bar_Baz_");
