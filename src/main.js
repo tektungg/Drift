@@ -23,6 +23,8 @@ let sortKey = localStorage.getItem("drift-sort-key") || "added";
 let sortDir = localStorage.getItem("drift-sort-dir") || "desc";
 let torrents = [];  // [{infohash, name, downloaded, total, down_bps, up_bps, peers, state_label}]
 let expanded = new Set();
+let selected = new Set();      // infohashes currently selected
+let lastClickedIh = null;      // anchor for shift-range selection
 
 // ── Theme (system / light / dark) ──
 let themeChoice = "system";
@@ -112,7 +114,24 @@ function renderList() {
     // click on a file checkbox in the expanded area would bubble up and
     // collapse the row. Right-click anywhere on the row opens the menu.
     const grid = n.querySelector(".row-grid");
-    if (grid) grid.onclick = () => toggleExpand(n.dataset.ih);
+    if (grid) grid.onclick = (e) => {
+      const ih = n.dataset.ih;
+      if (e.ctrlKey || e.metaKey) {
+        if (selected.has(ih)) selected.delete(ih); else selected.add(ih);
+        lastClickedIh = ih;
+        renderList(); updateBulkBar();
+      } else if (e.shiftKey && lastClickedIh) {
+        const order = [...document.querySelectorAll(".torrent-row")].map(r => r.dataset.ih);
+        const i = order.indexOf(lastClickedIh), j = order.indexOf(ih);
+        if (i !== -1 && j !== -1) {
+          const [lo, hi] = i < j ? [i, j] : [j, i];
+          for (let k = lo; k <= hi; k++) selected.add(order[k]);
+        }
+        renderList(); updateBulkBar();
+      } else {
+        toggleExpand(ih);
+      }
+    };
     n.oncontextmenu = (e) => { e.preventDefault(); openContextMenu(n.dataset.ih, e.clientX, e.clientY); };
   });
 }
@@ -181,7 +200,7 @@ function rowHtml(t) {
   const stClass = "st-" + (t.state_label || "downloading");
   const stColorVar = `var(--st-${t.state_label || "downloading"}, var(--accent))`;
   const label = (t.state_label || "downloading").replace(/^\w/, c => c.toUpperCase());
-  return `<div class="torrent-row" data-ih="${t.infohash}">
+  return `<div class="torrent-row ${selected.has(t.infohash) ? "selected" : ""}" data-ih="${t.infohash}">
     <div class="row-grid">
       <div class="ficon ${ic.cat}">${icon(ic.key)}</div>
       <div>
@@ -250,6 +269,8 @@ function toggleExpand(ih) {
 }
 
 function renderAll() { renderSidebar(); renderList(); }
+
+function updateBulkBar() { /* implemented in Task 4 */ }
 
 function wireListControls() {
   const search = document.getElementById("list-search");
@@ -642,6 +663,12 @@ listen("open-source", (e) => openAddDialog(e.payload));
 // forward by a magnet handoff (single-instance calls set_focus), pull any
 // pending source. take_pending_source() returns null when there's nothing,
 // so a normal focus is a harmless no-op.
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && selected.size) {
+    selected.clear(); lastClickedIh = null; renderList(); updateBulkBar();
+  }
+});
+
 window.addEventListener("focus", async () => {
   try {
     const pending = await invoke("take_pending_source");

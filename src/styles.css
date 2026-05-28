@@ -106,6 +106,8 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   padding: 10px 12px; margin: 0 -12px; border-radius: 10px; cursor: pointer;
   transition: background 0.12s ease; }
 .row-grid:hover { background: var(--hover); }
+.torrent-row.selected .row-grid { background: var(--accent-soft); }
+.torrent-row.selected .row-grid:hover { background: var(--accent-soft); }
 .row-grid .right { text-align: right; }
 .row-grid .right .pct { font-weight: 500; }
 .row-grid .right .state { font-size: 11px; display: flex; align-items: center; justify-content: flex-end; }
