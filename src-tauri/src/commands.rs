@@ -12,6 +12,24 @@ pub struct AppCtx {
     pub settings: Arc<SettingsStore>,
 }
 
+/// A magnet/torrent source captured from a launch argument (e.g. a magnet
+/// clicked in a browser) before the webview was ready to receive an event.
+/// The frontend pulls this once on boot via `take_pending_source`, which
+/// avoids the race where a one-shot `open-source` event fires before the
+/// JS listener is registered.
+pub static PENDING_SOURCE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Store a launch source for the frontend to pick up when it's ready.
+pub fn set_pending_source(s: String) {
+    if let Ok(mut g) = PENDING_SOURCE.lock() { *g = Some(s); }
+}
+
+/// Return and clear any pending launch source. Called by the frontend on boot.
+#[tauri::command]
+pub fn take_pending_source() -> Option<String> {
+    PENDING_SOURCE.lock().ok().and_then(|mut g| g.take())
+}
+
 #[tauri::command]
 pub async fn snapshot(ctx: tauri::State<'_, AppCtx>) -> Result<Vec<TorrentDto>, String> {
     let snap = ctx.state.snapshot();

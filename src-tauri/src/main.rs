@@ -76,6 +76,7 @@ async fn main() {
             commands::focus_main,
             commands::pick_folder,
             commands::pick_torrent_file,
+            commands::take_pending_source,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -182,16 +183,13 @@ async fn main() {
                 }
             }
 
-            // Cold-start: if launched with a magnet/torrent arg, emit it after the window is ready
+            // Cold-start: if launched with a magnet/torrent arg, stash it for the
+            // frontend to pull once its listeners are ready (avoids the race where
+            // a one-shot event fires before the webview registers a handler).
             let argv: Vec<String> = std::env::args().collect();
             for arg in argv.iter().skip(1) {
                 if arg.starts_with("magnet:?") || arg.ends_with(".torrent") {
-                    let handle = app.handle().clone();
-                    let payload = arg.clone();
-                    tauri::async_runtime::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-                        let _ = handle.emit("open-source", payload);
-                    });
+                    commands::set_pending_source(arg.clone());
                     break;
                 }
             }

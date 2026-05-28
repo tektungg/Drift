@@ -572,6 +572,13 @@ listen("open-source", (e) => openAddDialog(e.payload));
     else torrents.push({ name: u.infohash, ...u });
     renderAll();
   });
+  // If Drift was cold-launched from a magnet/.torrent (e.g. a magnet clicked
+  // in a browser), the source was stashed in Rust — pull it now that our
+  // listeners and dialog are ready, and open the Add dialog pre-filled.
+  try {
+    const pending = await invoke("take_pending_source");
+    if (pending) openAddDialog(pending);
+  } catch (e) { /* no pending source */ }
 })();
 
 // Drag-drop is handled entirely in Rust via WindowEvent::DragDrop, which
