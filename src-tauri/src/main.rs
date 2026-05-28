@@ -84,11 +84,17 @@ fn main() {
             let cfg0 = settings.get();
             engine.set_global_limits(cfg0.download_kbps, cfg0.upload_kbps);
 
-            // Resume previously persisted torrents (non-paused ones)
+            // Re-attach previously persisted torrents. Skip both user-Paused AND
+            // Queued ones: librqbit restores Queued torrents in their engine-paused
+            // state, and the reconcile() below decides which queued torrents get a
+            // slot. Unpausing them here would let over-cap torrents run after a
+            // restart (reconcile only re-pauses records it sees as actively running).
             let snap = state.snapshot();
             tauri::async_runtime::block_on(async {
                 for r in &snap.torrents {
-                    if matches!(r.state, drift::state::TorrentState::Paused) { continue; }
+                    if matches!(r.state,
+                        drift::state::TorrentState::Paused | drift::state::TorrentState::Queued
+                    ) { continue; }
                     if let Err(e) = engine
                         .resume_existing(
                             &drift::magnet::InfoHash(r.infohash.clone()),
