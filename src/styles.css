@@ -240,3 +240,12 @@ input[type=text], textarea, select {
 .list-sort { padding: 0 8px; cursor: pointer; }
 .list-sortdir { padding: 0 11px; cursor: pointer; line-height: 1; }
 .list-sortdir:hover, .list-sort:hover { border-color: var(--accent); }
+
+.bulk-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px;
+}
+.bulk-bar .count { font-weight: 500; }
+.bulk-bar .spacer { flex: 1; }
+.bulk-bar button { font-size: 12px; padding: 5px 11px; }

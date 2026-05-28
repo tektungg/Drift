@@ -268,9 +268,55 @@ function toggleExpand(ih) {
   renderList();
 }
 
-function renderAll() { renderSidebar(); renderList(); }
+function renderAll() {
+  for (const ih of [...selected]) if (!torrents.some(t => t.infohash === ih)) selected.delete(ih);
+  renderSidebar(); renderList();
+}
 
-function updateBulkBar() { /* implemented in Task 4 */ }
+function updateBulkBar() {
+  const bar = document.getElementById("bulk-bar");
+  if (!bar) return;
+  if (selected.size === 0) { bar.hidden = true; bar.innerHTML = ""; return; }
+  bar.hidden = false;
+  bar.innerHTML = `
+    <span class="count">${selected.size} selected</span>
+    <div class="spacer"></div>
+    <button class="btn-ghost" id="bulk-resume">Resume</button>
+    <button class="btn-ghost" id="bulk-pause">Pause</button>
+    <button class="btn-ghost" id="bulk-remove">Remove</button>
+    <button class="btn-ghost" id="bulk-clear">Clear</button>`;
+  document.getElementById("bulk-resume").onclick = () => bulkAction("resume");
+  document.getElementById("bulk-pause").onclick  = () => bulkAction("pause");
+  document.getElementById("bulk-remove").onclick = () => bulkRemove();
+  document.getElementById("bulk-clear").onclick  = () => {
+    selected.clear(); lastClickedIh = null; renderList(); updateBulkBar();
+  };
+}
+
+async function bulkAction(cmd) {
+  const ids = [...selected];
+  for (const ih of ids) {
+    try { await invoke(cmd, { infohash: ih }); } catch (e) { /* no-op if not applicable */ }
+  }
+  torrents = await invoke("snapshot");
+  selected.clear(); lastClickedIh = null;
+  renderAll(); updateBulkBar();
+}
+
+async function bulkRemove() {
+  const ids = [...selected];
+  if (!ids.length) return;
+  if (!window.confirm(`Remove ${ids.length} torrent(s) from Drift?`)) return;
+  const deleteFiles = window.confirm(
+    "Also DELETE the downloaded files from disk?\n\nOK = delete files.\nCancel = keep files on disk."
+  );
+  for (const ih of ids) {
+    try { await invoke("remove", { infohash: ih, deleteFiles }); } catch (e) { /* ignore */ }
+  }
+  torrents = await invoke("snapshot");
+  selected.clear(); lastClickedIh = null;
+  renderAll(); updateBulkBar();
+}
 
 function wireListControls() {
   const search = document.getElementById("list-search");
