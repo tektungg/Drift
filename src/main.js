@@ -242,7 +242,7 @@ async function openAddDialog(initialSource = "") {
     <div class="modal-backdrop">
       <div class="modal">
         <h2>Add torrent</h2>
-        <textarea id="addsrc" rows="3" placeholder="Paste a magnet link or drop a .torrent file"></textarea>
+        <textarea id="addsrc" rows="3" style="resize:none" placeholder="Paste a magnet link or drop a .torrent file"></textarea>
         <div id="addmeta" style="margin-top:14px; min-height:80px; font-size:13px; color:var(--ink-soft)"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px">
           <button class="btn-ghost" id="addcancel">Cancel</button>
