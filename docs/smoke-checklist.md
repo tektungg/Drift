@@ -62,3 +62,13 @@ Run before every release (and after major changes). All on Windows 11.
 - [ ] Coral accent used on primary actions, progress bars
 - [ ] Serif used on headings ("Drift", "All downloads", "Add torrent")
 - [ ] No system-default chrome visible (custom titlebar in use)
+
+## UI polish (0.2.0)
+- [ ] Each state shows the correct dot color + tinted progress (downloading=coral, seeding=sage, completed=teal, paused=gray, stalled=amber)
+- [ ] Torrent rows show a file-type line icon (or folder icon for folder torrents)
+- [ ] ETA shows a sensible value while downloading, "—" when paused/stalled/0 speed
+- [ ] Sidebar filters have icons + live counts; totals card shows aggregate down/up
+- [ ] Empty "All" filter shows the wave glyph + three hint cards; other empty filters show the lighter variant
+- [ ] Settings is grouped (Downloads / Behavior / Categories); the three booleans are toggle switches that flip coral/gray and persist after Save + reopen
+- [ ] Add dialog file rows show per-file line icons; long save paths still front-truncate
+- [ ] Row hover highlights; progress bars animate smoothly on the 1 Hz updates with no flicker
