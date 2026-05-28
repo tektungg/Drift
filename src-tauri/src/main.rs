@@ -70,6 +70,8 @@ fn main() {
             commands::pick_folder,
             commands::pick_torrent_file,
             commands::take_pending_source,
+            commands::force_start,
+            commands::move_in_queue,
         ])
         .setup(|app| {
             // ── Heavy init (runs only on the PRIMARY instance) ──────────────────

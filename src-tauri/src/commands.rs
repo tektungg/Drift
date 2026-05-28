@@ -553,6 +553,50 @@ pub async fn torrent_files(ctx: tauri::State<'_, AppCtx>, infohash: String) -> R
     Ok(serde_json::to_value(files).unwrap())
 }
 
+/// Force a torrent to run regardless of the active-downloads cap.
+#[tauri::command]
+pub async fn force_start(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(), String> {
+    if let Some(mut r) = ctx.state.snapshot().torrents.into_iter().find(|t| t.infohash == infohash) {
+        r.forced = true;
+        if matches!(r.state, TorrentState::Paused | TorrentState::Queued) {
+            r.state = TorrentState::Downloading; // provisional; reconcile confirms
+        }
+        ctx.state.upsert(r).map_err(|e| e.to_string())?;
+    }
+    let max_active = ctx.settings.get().max_active_downloads;
+    crate::queue::reconcile(&ctx.engine, &ctx.state, max_active).await;
+    Ok(())
+}
+
+/// Reorder a torrent's queue priority. `dir` is "top" | "up" | "down" | "bottom".
+#[tauri::command]
+pub async fn move_in_queue(ctx: tauri::State<'_, AppCtx>, infohash: String, dir: String) -> Result<(), String> {
+    // Work on a sorted-by-position vector, move the target, then renumber 0..n.
+    let mut recs = ctx.state.snapshot().torrents;
+    recs.sort_by_key(|r| r.queue_position);
+    let idx = recs.iter().position(|r| r.infohash == infohash)
+        .ok_or_else(|| "torrent not found".to_string())?;
+    let new_idx = match dir.as_str() {
+        "top" => 0,
+        "bottom" => recs.len().saturating_sub(1),
+        "up" => idx.saturating_sub(1),
+        "down" => (idx + 1).min(recs.len().saturating_sub(1)),
+        _ => return Err("bad direction".into()),
+    };
+    if new_idx != idx {
+        let item = recs.remove(idx);
+        recs.insert(new_idx, item);
+    }
+    // Renumber and persist.
+    for (i, r) in recs.iter_mut().enumerate() {
+        r.queue_position = i as u32;
+        ctx.state.upsert(r.clone()).map_err(|e| e.to_string())?;
+    }
+    let max_active = ctx.settings.get().max_active_downloads;
+    crate::queue::reconcile(&ctx.engine, &ctx.state, max_active).await;
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn set_file_selection(ctx: tauri::State<'_, AppCtx>, infohash: String, selected: Vec<usize>) -> Result<(), String> {
     if selected.is_empty() {
