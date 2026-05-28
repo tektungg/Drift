@@ -223,6 +223,7 @@ function friendlyError(e) {
   if (s.includes("select_at_least_one")) return "Pick at least one file — to stop downloading entirely, remove the torrent.";
   if (s.includes("metadata_timeout")) return "Couldn't fetch metadata in 60s — too few seeds or no network.";
   if (s.toLowerCase().includes("not a magnet")) return "Couldn't read this torrent.";
+  if (s.toLowerCase().includes("cannot read torrent file")) return "Couldn't read this torrent — paste a magnet link or drop a valid .torrent file.";
   if (s.includes("os error 112") || s.toLowerCase().includes("no space")) return "Disk full — torrent paused.";
   if (s.toLowerCase().includes("permission denied")) return "Write permission denied — torrent paused.";
   if (s.toLowerCase().includes("not_found")) return "Torrent not found.";
@@ -275,7 +276,9 @@ async function openAddDialog(initialSource = "") {
       renderMeta();
       btn.disabled = false;
     } catch (e) {
-      meta.textContent = friendlyError(e);
+      // Wrap + clamp to 5 lines so a long/garbage paste echoed in the error
+      // can't overflow the dialog horizontally or blow up its height.
+      meta.innerHTML = `<div class="meta-err">${escape(friendlyError(e))}</div>`;
       lastFetched = "";  // allow retry on the same string after a failure
     }
   }
