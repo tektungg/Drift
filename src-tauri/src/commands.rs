@@ -182,15 +182,29 @@ pub fn set_settings(ctx: tauri::State<'_, AppCtx>, value: serde_json::Value) -> 
     Ok(())
 }
 
+/// Build a `reg.exe` command that runs WITHOUT popping a console window.
+/// reg.exe is a console app, so spawning it from our GUI process would flash a
+/// black console window for each call — and saving settings makes several. The
+/// CREATE_NO_WINDOW flag suppresses that.
+fn reg_command() -> std::process::Command {
+    let mut c = std::process::Command::new("reg");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        c.creation_flags(CREATE_NO_WINDOW);
+    }
+    c
+}
+
 fn apply_startup_registration(enable: bool) -> anyhow::Result<()> {
-    use std::process::Command;
     let exe = std::env::current_exe()?.to_string_lossy().into_owned();
     if enable {
-        Command::new("reg").args(["add",
+        reg_command().args(["add",
             r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
             "/v", "Drift", "/t", "REG_SZ", "/d", &exe, "/f"]).status()?;
     } else {
-        let _ = Command::new("reg").args(["delete",
+        let _ = reg_command().args(["delete",
             r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
             "/v", "Drift", "/f"]).status();
     }
@@ -207,18 +221,17 @@ fn apply_startup_registration(enable: bool) -> anyhow::Result<()> {
 /// becomes a candidate handler; if another client is already the default, the
 /// user may need to pick Drift under Settings → Apps → Default apps.
 fn apply_magnet_handler(enable: bool) -> anyhow::Result<()> {
-    use std::process::Command;
     if enable {
         let exe = std::env::current_exe()?.to_string_lossy().into_owned();
-        Command::new("reg").args(["add", r"HKCU\Software\Classes\magnet",
+        reg_command().args(["add", r"HKCU\Software\Classes\magnet",
             "/ve", "/t", "REG_SZ", "/d", "URL:Magnet Protocol", "/f"]).status()?;
-        Command::new("reg").args(["add", r"HKCU\Software\Classes\magnet",
+        reg_command().args(["add", r"HKCU\Software\Classes\magnet",
             "/v", "URL Protocol", "/t", "REG_SZ", "/d", "", "/f"]).status()?;
         let cmd = format!("\"{}\" \"%1\"", exe);
-        Command::new("reg").args(["add", r"HKCU\Software\Classes\magnet\shell\open\command",
+        reg_command().args(["add", r"HKCU\Software\Classes\magnet\shell\open\command",
             "/ve", "/t", "REG_SZ", "/d", &cmd, "/f"]).status()?;
     } else {
-        let _ = Command::new("reg").args(["delete",
+        let _ = reg_command().args(["delete",
             r"HKCU\Software\Classes\magnet", "/f"]).status();
     }
     Ok(())
