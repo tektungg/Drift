@@ -409,6 +409,23 @@ mod helper_tests {
     }
 }
 
+/// Show a native folder picker. Returns the chosen absolute path, or
+/// `None` if the user cancelled. `start` is the directory to open the
+/// picker at (typically the current category path).
+#[tauri::command]
+pub fn pick_folder(app: tauri::AppHandle, start: Option<String>) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = app.dialog().file();
+    if let Some(s) = start.filter(|s| !s.trim().is_empty()) {
+        builder = builder.set_directory(&s);
+    }
+    let picked = builder
+        .blocking_pick_folder()
+        .and_then(|fp| fp.into_path().ok())
+        .map(|p| p.to_string_lossy().into_owned());
+    Ok(picked)
+}
+
 /// Bring the main window forward (used by the magnet-toast popup when the
 /// user accepts a detected magnet — we want the focus to land on the Add
 /// Torrent dialog that opens next).

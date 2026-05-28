@@ -172,6 +172,7 @@ async function openAddDialog(initialSource = "") {
   let selected = null;
   let lastFetched = "";  // prevents re-peek on the same source
   let fetchTimer = null;
+  let overridePath = null;  // null = use auto-categorized path from peek
 
   async function refresh() {
     const src = ta.value.trim();
@@ -203,10 +204,22 @@ async function openAddDialog(initialSource = "") {
         </label>
         <span>${fmtBytes(f.size)}</span>
       </div>`).join("");
+    const displayPath = overridePath ?? lastMeta.predicted_save_path;
+    const customLabel = overridePath ? " (custom)" : "";
     meta.innerHTML = `
       <div style="color:var(--ink); margin-bottom:6px">${escape(lastMeta.name)}</div>
       <div>${fmtBytes(lastMeta.total_size)} total · ${lastMeta.files.length} file(s)</div>
-      <div style="margin-top:8px">Will go to <code>${escape(lastMeta.predicted_save_path)}</code></div>
+      <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+        <span>Will go to</span>
+        <code style="word-break:break-all; flex:1; min-width:0">${escape(displayPath)}</code>
+        <button class="btn-ghost" id="change-folder"
+                style="padding:3px 10px; font-size:11px">Change…</button>
+        ${overridePath ? `<button class="btn-ghost" id="reset-folder"
+                style="padding:3px 10px; font-size:11px">Reset</button>` : ""}
+      </div>
+      <div style="font-size:11px; color:var(--ink-soft); margin-top:2px">
+        ${customLabel ? `Custom location · ` : `Auto-categorized · `}you can change it here or in Settings.
+      </div>
       <div style="margin-top:10px; max-height:200px; overflow-y:auto">${filesHtml}</div>`;
     meta.querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = () => {
       const i = +cb.dataset.i;
@@ -214,6 +227,20 @@ async function openAddDialog(initialSource = "") {
       else { selected = selected.filter(x => x !== i); }
       btn.disabled = selected.length === 0;
     });
+    document.getElementById("change-folder").onclick = async () => {
+      const startDir = overridePath ?? lastMeta.predicted_save_path;
+      try {
+        const picked = await invoke("pick_folder", { start: startDir });
+        if (picked) {
+          overridePath = picked;
+          renderMeta();
+        }
+      } catch (e) {
+        showToast("error", friendlyError(e));
+      }
+    };
+    const resetBtn = document.getElementById("reset-folder");
+    if (resetBtn) resetBtn.onclick = () => { overridePath = null; renderMeta(); };
   }
 
   // Refresh strategy: peek immediately on paste, and after the user stops typing
@@ -222,9 +249,11 @@ async function openAddDialog(initialSource = "") {
   ta.addEventListener("input", () => {
     // The source changed; any cached metadata is no longer valid. Disable Add
     // until refresh() completes so the user can't fire add_torrent with stale
-    // file selections that don't match the new torrent.
+    // file selections that don't match the new torrent. Also clear any custom
+    // save path the user picked — it was tied to the previous magnet.
     lastMeta = null;
     selected = null;
+    overridePath = null;
     btn.disabled = true;
     clearTimeout(fetchTimer);
     fetchTimer = setTimeout(refresh, 500);
@@ -238,7 +267,7 @@ async function openAddDialog(initialSource = "") {
       const allSelected = lastMeta && selected.length === lastMeta.files.length;
       await invoke("add_torrent", {
         req: { source: ta.value.trim(),
-               overridePath: null,
+               overridePath: overridePath,
                selectedFiles: allSelected ? null : selected }
       });
       root.innerHTML = "";
