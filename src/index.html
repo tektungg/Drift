@@ -3,6 +3,18 @@
 <head>
   <meta charset="utf-8">
   <title>Drift</title>
+  <!-- Apply the saved theme before first paint to avoid a flash. main.js
+       reconciles this with the persisted config on load. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("drift-theme") || "system";
+        var dark = t === "dark" ||
+          (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>

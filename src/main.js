@@ -20,6 +20,23 @@ let currentFilter = "all";
 let torrents = [];  // [{infohash, name, downloaded, total, down_bps, up_bps, peers, state_label}]
 let expanded = new Set();
 
+// ── Theme (system / light / dark) ──
+let themeChoice = "system";
+function resolveTheme(choice) {
+  if (choice === "dark") return "dark";
+  if (choice === "light") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+function applyTheme(choice) {
+  themeChoice = choice || "system";
+  document.documentElement.dataset.theme = resolveTheme(themeChoice);
+  try { localStorage.setItem("drift-theme", themeChoice); } catch (e) {}
+}
+// Track the OS theme live while in "system" mode.
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (themeChoice === "system") document.documentElement.dataset.theme = resolveTheme("system");
+});
+
 function renderSidebar() {
   const el = document.getElementById("sidebar");
   const counts = Object.fromEntries(FILTERS.map(f => [f.key, 0]));
@@ -373,6 +390,17 @@ async function toggleSettings() {
     </div>
 
     <div class="settings-group">
+      <div class="group-label">Appearance</div>
+      <div class="settings-row"><span>Theme</span>
+        <div class="seg" id="s-theme">
+          <button class="seg-btn ${(cfg.theme || 'system') === 'system' ? 'active' : ''}" data-val="system" title="System">${icon('system')}</button>
+          <button class="seg-btn ${cfg.theme === 'light' ? 'active' : ''}" data-val="light" title="Light">${icon('light')}</button>
+          <button class="seg-btn ${cfg.theme === 'dark' ? 'active' : ''}" data-val="dark" title="Dark">${icon('dark')}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
       <div class="group-label">Behavior</div>
       <div class="settings-row"><span>Watch clipboard for magnet links</span>
         <button class="switch ${cfg.clipboard_watch ? "" : "off"}" id="s-clip" data-on="${cfg.clipboard_watch}"></button></div>
@@ -404,9 +432,18 @@ async function toggleSettings() {
     sw.classList.toggle("off", !on);
   });
 
+  // Theme segmented control: mark active + apply live for instant preview.
+  const themeBtns = panel.querySelectorAll("#s-theme .seg-btn");
+  themeBtns.forEach(b => b.onclick = () => {
+    themeBtns.forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    applyTheme(b.dataset.val);
+  });
+
   document.getElementById("s-cancel").onclick = () => panel.classList.remove("open");
   document.getElementById("s-save").onclick = async () => {
     const isOn = id => document.getElementById(id).dataset.on === "true";
+    const themeBtn = panel.querySelector("#s-theme .seg-btn.active");
     const value = {
       download_root: document.getElementById("s-root").value,
       download_kbps: +document.getElementById("s-down").value || 0,
@@ -414,12 +451,17 @@ async function toggleSettings() {
       clipboard_watch: isOn("s-clip"),
       close_to_tray: isOn("s-tray"),
       start_with_windows: isOn("s-startup"),
+      theme: themeBtn ? themeBtn.dataset.val : "system",
       category_map: Object.fromEntries(
         ["video","audio","documents","compressed","programs","images"].map(k =>
           [k, document.getElementById("s-cat-"+k).value.split(/\s+/).filter(Boolean)])),
     };
-    try { await invoke("set_settings", { value }); panel.classList.remove("open"); showToast("info", "Settings saved."); }
-    catch (e) { showToast("error", friendlyError(e)); }
+    try {
+      await invoke("set_settings", { value });
+      applyTheme(value.theme);  // commit the chosen theme + sync localStorage
+      panel.classList.remove("open");
+      showToast("info", "Settings saved.");
+    } catch (e) { showToast("error", friendlyError(e)); }
   };
 }
 
@@ -481,6 +523,11 @@ listen("open-source", (e) => openAddDialog(e.payload));
 
 // Boot: load current snapshot from Rust + subscribe to events
 (async () => {
+  // Reconcile the persisted theme (source of truth) with the pre-paint guess.
+  try {
+    const cfg = await invoke("get_settings");
+    applyTheme(cfg.theme || "system");
+  } catch (e) { /* pre-paint script already applied a sensible default */ }
   try {
     torrents = await invoke("snapshot");
   } catch (e) {

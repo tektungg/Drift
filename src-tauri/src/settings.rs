@@ -12,8 +12,14 @@ pub struct Config {
     pub clipboard_watch: bool,
     pub start_with_windows: bool,
     pub close_to_tray: bool,
+    /// UI theme: "system" | "light" | "dark". Frontend-only; defaulted so
+    /// config.json files written before this field existed still load.
+    #[serde(default = "default_theme")]
+    pub theme: String,
     pub category_map: SerCategoryMap,
 }
+
+fn default_theme() -> String { "system".into() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerCategoryMap {
@@ -48,6 +54,7 @@ impl Default for Config {
             clipboard_watch: true,
             start_with_windows: false,
             close_to_tray: true,
+            theme: "system".into(),
             category_map: CategoryMap::default().into(),
         }
     }

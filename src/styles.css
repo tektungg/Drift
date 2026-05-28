@@ -20,6 +20,34 @@
   --prog-track:     #ECE5D6;
   --icon-bg:        #EFE9DB;
   --icon-fg:        #6B645A;
+  --icon-audio-bg:  #E3EAD9;
+  --switch-off:     #D8D0C0;
+  --hover:          rgba(0,0,0,0.03);
+}
+
+/* Dark theme — warm charcoal, Claude-style. Applied via data-theme="dark"
+   on <html> (set by the pre-paint script in index.html and by main.js). */
+:root[data-theme="dark"] {
+  --bg: #262624;
+  --surface: #30302E;
+  --ink: #ECE6DA;
+  --ink-soft: #9C968A;
+  --line: #3A3936;
+  --accent: #D97757;
+  --accent-soft: #3D2D26;
+  --accent-hover: #E08868;
+  --st-downloading: #E08365;
+  --st-seeding:     #8FAE87;
+  --st-completed:   #7FA39A;
+  --st-paused:      #B0A99C;
+  --st-stalled:     #D8B065;
+  --st-error:       #D8654A;
+  --prog-track:     #3A3936;
+  --icon-bg:        #34332F;
+  --icon-fg:        #9C968A;
+  --icon-audio-bg:  #2C352A;
+  --switch-off:     #4A4844;
+  --hover:          rgba(255,255,255,0.05);
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
@@ -29,12 +57,12 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
   display: flex; flex-direction: column; gap: 2px; }
 .side-item { padding: 8px 11px; border-radius: var(--radius-sm); color: var(--ink-soft); cursor: pointer;
   display: flex; align-items: center; gap: 9px; font-size: 13px; }
-.side-item:hover { background: rgba(0,0,0,0.03); }
+.side-item:hover { background: var(--hover); }
 .side-item.active { background: var(--accent-soft); color: var(--ink); }
 .side-bottom { margin-top: auto; border-top: 1px solid var(--line); padding-top: 8px; }
 .side-settings { padding: 8px 11px; border-radius: var(--radius-sm); color: var(--ink-soft); cursor: pointer;
   font-size: 13px; display: flex; align-items: center; gap: 9px; }
-.side-settings:hover { background: rgba(0,0,0,0.03); color: var(--ink); }
+.side-settings:hover { background: var(--hover); color: var(--ink); }
 .main { padding: 20px 24px; overflow-y: auto; }
 .main-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .main-head h1 { font-family: var(--font-serif); font-size: 18px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
@@ -44,7 +72,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .btn-ghost { background: transparent; border: 1px solid var(--line); padding: 6px 12px; border-radius: 7px;
   color: var(--ink); cursor: pointer; font-size: 13px; }
 .torrent-row { padding: 14px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
-.torrent-row:hover { background: rgba(0,0,0,0.02); }
+.torrent-row:hover { background: var(--hover); }
 .torrent-row .name { margin-bottom: 6px; }
 .torrent-row .meta { font-size: 11px; color: var(--ink-soft); margin-top: 6px; }
 .progress { height: 6px; background: var(--prog-track); border-radius: 99px; overflow: hidden; }
@@ -100,13 +128,13 @@ input[type=text], textarea, select {
   background: var(--icon-bg); color: var(--icon-fg); }
 .ficon svg { width: 16px; height: 16px; }
 .ficon.video { background: var(--accent-soft); }
-.ficon.audio { background: #E3EAD9; }
+.ficon.audio { background: var(--icon-audio-bg); }
 
 /* Toggle switch (settings booleans) */
 .switch { width: 34px; height: 20px; border-radius: 99px; background: var(--accent);
   position: relative; flex-shrink: 0; cursor: pointer; border: 0; padding: 0;
   transition: background 0.18s ease; }
-.switch.off { background: #D8D0C0; }
+.switch.off { background: var(--switch-off); }
 .switch::after { content: ""; position: absolute; width: 16px; height: 16px;
   border-radius: 50%; background: #fff; top: 2px; right: 2px; transition: all 0.18s ease; }
 .switch.off::after { right: auto; left: 2px; }
@@ -148,3 +176,13 @@ input[type=text], textarea, select {
 .settings-row:last-child { border-bottom: 0; }
 .settings-row .num { width: 90px; text-align: right; }
 .file-row .ficon svg { width: 12px; height: 12px; }
+
+/* Segmented control (theme toggle: System / Light / Dark) */
+.seg { display: inline-flex; gap: 3px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+.seg-btn { border: 0; background: transparent; color: var(--ink-soft); cursor: pointer;
+  width: 32px; height: 26px; border-radius: 6px; display: flex; align-items: center;
+  justify-content: center; transition: background 0.15s ease, color 0.15s ease; }
+.seg-btn:hover { color: var(--ink); }
+.seg-btn svg { width: 15px; height: 15px; }
+.seg-btn.active { background: var(--accent-soft); color: var(--accent); }
