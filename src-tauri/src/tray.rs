@@ -12,6 +12,9 @@ pub fn install(app: &AppHandle) -> tauri::Result<TrayIcon> {
 
     TrayIconBuilder::with_id("drift-tray")
         .menu(&menu)
+        // Menu opens on RIGHT-click only; left-click is handled by
+        // on_tray_icon_event below (toggle window visibility).
+        .show_menu_on_left_click(false)
         .on_menu_event(|app, ev| match ev.id.as_ref() {
             "show" => {
                 if let Some(w) = app.get_webview_window("main") {
