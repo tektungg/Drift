@@ -593,6 +593,12 @@ async function toggleSettings() {
         <button class="switch ${cfg.magnet_handler ? "" : "off"}" id="s-magnet" data-on="${!!cfg.magnet_handler}"></button></div>
     </div>
 
+    <div class="settings-group">
+      <div class="group-label">Queue</div>
+      <div class="settings-row"><span>Max active downloads (0 = unlimited)</span>
+        <input class="num" type="text" id="s-maxactive" value="${cfg.max_active_downloads ?? 3}"></div>
+    </div>
+
     <details class="settings-group">
       <summary style="cursor:pointer; font-size:10px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-soft)">Category extensions</summary>
       ${["video","audio","documents","compressed","programs","images"].map(k => `
@@ -635,6 +641,7 @@ async function toggleSettings() {
       close_to_tray: isOn("s-tray"),
       start_with_windows: isOn("s-startup"),
       magnet_handler: isOn("s-magnet"),
+      max_active_downloads: +document.getElementById("s-maxactive").value || 0,
       theme: themeBtn ? themeBtn.dataset.val : "system",
       category_map: Object.fromEntries(
         ["video","audio","documents","compressed","programs","images"].map(k =>
