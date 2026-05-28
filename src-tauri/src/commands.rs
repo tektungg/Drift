@@ -164,19 +164,20 @@ pub fn get_settings(ctx: tauri::State<'_, AppCtx>) -> serde_json::Value {
 pub fn set_settings(ctx: tauri::State<'_, AppCtx>, value: serde_json::Value) -> Result<(), String> {
     let cfg: crate::settings::Config = serde_json::from_value(value).map_err(|e| e.to_string())?;
 
-    // Apply the fallible side-effects (registry writes) first. If they fail, no UI/runtime
-    // state has been mutated yet, so the user can see the error and try again cleanly.
-    apply_startup_registration(cfg.start_with_windows).map_err(|e| e.to_string())?;
-    apply_magnet_handler(cfg.magnet_handler).map_err(|e| e.to_string())?;
-
-    // Then persist to disk (also fallible). If this fails we've registered the Run key but
-    // the saved config doesn't reflect it — minor inconsistency, but the next save will
-    // converge.
+    // Persist to disk + apply the fast in-memory side-effects synchronously.
     ctx.settings.replace(cfg.clone()).map_err(|e| e.to_string())?;
-
-    // Finally apply the in-memory side-effects, which can't fail.
     ctx.engine.set_global_limits(cfg.download_kbps, cfg.upload_kbps);
     crate::clipboard::ENABLED.store(cfg.clipboard_watch, std::sync::atomic::Ordering::Relaxed);
+
+    // The registry writes shell out to reg.exe (4 processes) which is slow enough
+    // to visibly freeze the UI if done on the command thread. Run them on a detached
+    // background thread, best-effort — they rarely fail and the config is already saved.
+    let start = cfg.start_with_windows;
+    let magnet = cfg.magnet_handler;
+    std::thread::spawn(move || {
+        let _ = apply_startup_registration(start);
+        let _ = apply_magnet_handler(magnet);
+    });
 
     Ok(())
 }

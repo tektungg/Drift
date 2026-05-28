@@ -548,8 +548,19 @@ function showToast(kind, message) {
 // listen for toast events from Rust
 listen("toast", (e) => showToast(e.payload.kind, e.payload.message));
 
-// Single-instance: second launch forwards magnet/torrent to open the Add dialog
+// Single-instance: second launch forwards magnet/torrent to open the Add dialog.
 listen("open-source", (e) => openAddDialog(e.payload));
+
+// Reliable fallback for the already-running case: when the window is brought
+// forward by a magnet handoff (single-instance calls set_focus), pull any
+// pending source. take_pending_source() returns null when there's nothing,
+// so a normal focus is a harmless no-op.
+window.addEventListener("focus", async () => {
+  try {
+    const pending = await invoke("take_pending_source");
+    if (pending) openAddDialog(pending);
+  } catch (e) { /* nothing pending */ }
+});
 
 // Boot: load current snapshot from Rust + subscribe to events
 (async () => {

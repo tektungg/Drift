@@ -13,51 +13,44 @@ fn app_data_dir() -> std::path::PathBuf {
     base.join("Drift")
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     tracing_subscriber::fmt::init();
-    let data_dir = app_data_dir();
-    std::fs::create_dir_all(&data_dir).expect("create data dir");
-    let state = Arc::new(StateStore::load_or_init(&data_dir).expect("load state"));
-    let settings = Arc::new(SettingsStore::load_or_init(&data_dir).expect("load settings"));
-    let engine = Engine::new(&data_dir.join("resume")).await.expect("init engine");
 
-    // apply persisted limits
-    let cfg0 = settings.get();
-    engine.set_global_limits(cfg0.download_kbps, cfg0.upload_kbps);
-
-    // Resume previously persisted torrents (non-paused ones)
-    let snap = state.snapshot();
-    for r in &snap.torrents {
-        if matches!(r.state, drift::state::TorrentState::Paused) { continue; }
-        if let Err(e) = engine.resume_existing(
-            &drift::magnet::InfoHash(r.infohash.clone()),
-            &r.save_path,
-        ).await {
-            tracing::warn!("failed to resume {}: {e}", r.infohash);
-        }
-    }
-
-    // Hold a clone of the engine for the progress-emit task; the ctx takes the other.
-    let mut rx = engine.subscribe();
-    let ctx = AppCtx { engine: engine.clone(), state: state.clone(), settings: settings.clone() };
-
+    // IMPORTANT: the single-instance plugin must be registered FIRST and all the
+    // heavy initialization (the librqbit engine, which binds DHT/peer sockets)
+    // must happen inside `.setup()`. When a second copy launches — e.g. a magnet
+    // clicked in a browser while Drift is already running — the single-instance
+    // plugin detects the primary instance during `.run()`, forwards argv to it,
+    // and terminates the secondary process BEFORE `.setup()` runs. If we created
+    // the engine in `main()` (before the builder), the secondary would panic
+    // trying to bind a port already held by the primary, the callback would never
+    // fire, and the magnet would be silently dropped.
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            // Existing instance receives the launched argv
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
-            // Forward magnet/torrent arg to frontend
+            // A second launch lands here on the PRIMARY instance. Stash the source
+            // FIRST, then bring the window forward — the frontend re-pulls the
+            // pending source on focus, which is reliable even when a cross-context
+            // emit isn't delivered.
+            let mut source: Option<String> = None;
             for arg in argv.iter().skip(1) {
                 if arg.starts_with("magnet:?") || arg.ends_with(".torrent") {
-                    let _ = app.emit("open-source", arg.clone());
+                    commands::set_pending_source(arg.clone());
+                    source = Some(arg.clone());
                     break;
                 }
             }
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+                // Emit on the window itself (more reliable than the app-wide emit
+                // from this plugin-callback context). The frontend also pulls the
+                // pending source on focus as a fallback.
+                if let Some(src) = source {
+                    let _ = w.emit("open-source", src);
+                }
+            }
         }))
-        .manage(ctx)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -78,10 +71,49 @@ async fn main() {
             commands::pick_torrent_file,
             commands::take_pending_source,
         ])
-        .setup(move |app| {
+        .setup(|app| {
+            // ── Heavy init (runs only on the PRIMARY instance) ──────────────────
+            let data_dir = app_data_dir();
+            std::fs::create_dir_all(&data_dir).expect("create data dir");
+            let state = Arc::new(StateStore::load_or_init(&data_dir).expect("load state"));
+            let settings = Arc::new(SettingsStore::load_or_init(&data_dir).expect("load settings"));
+            let engine = tauri::async_runtime::block_on(Engine::new(&data_dir.join("resume")))
+                .expect("init engine");
+
+            // apply persisted limits
+            let cfg0 = settings.get();
+            engine.set_global_limits(cfg0.download_kbps, cfg0.upload_kbps);
+
+            // Resume previously persisted torrents (non-paused ones)
+            let snap = state.snapshot();
+            tauri::async_runtime::block_on(async {
+                for r in &snap.torrents {
+                    if matches!(r.state, drift::state::TorrentState::Paused) { continue; }
+                    if let Err(e) = engine
+                        .resume_existing(
+                            &drift::magnet::InfoHash(r.infohash.clone()),
+                            &r.save_path,
+                        )
+                        .await
+                    {
+                        tracing::warn!("failed to resume {}: {e}", r.infohash);
+                    }
+                }
+            });
+
+            // Hold a clone of the engine for the progress-emit task; the ctx takes
+            // the other.
+            let mut rx = engine.subscribe();
+            let ctx = AppCtx {
+                engine: engine.clone(),
+                state: state.clone(),
+                settings: settings.clone(),
+            };
+            app.manage(ctx);
+
             let handle = app.handle().clone();
             let state_for_emit = state.clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 use drift::state::TorrentState;
                 use std::collections::HashMap;
                 let mut last_state_label: HashMap<String, String> = HashMap::new();
