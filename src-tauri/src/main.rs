@@ -101,6 +101,11 @@ fn main() {
                 }
             });
 
+            // Honor the queue cap on launch instead of blindly running everything.
+            tauri::async_runtime::block_on(
+                drift::queue::reconcile(&engine, &state, cfg0.max_active_downloads)
+            );
+
             // Hold a clone of the engine for the progress-emit task; the ctx takes
             // the other.
             let mut rx = engine.subscribe();
@@ -113,6 +118,8 @@ fn main() {
 
             let handle = app.handle().clone();
             let state_for_emit = state.clone();
+            let engine_for_emit = engine.clone();
+            let settings_for_emit = settings.clone();
             tauri::async_runtime::spawn(async move {
                 use drift::state::TorrentState;
                 use std::collections::HashMap;
@@ -134,7 +141,13 @@ fn main() {
                             let new_state = match u.state_label.as_str() {
                                 "downloading" => Some(TorrentState::Downloading),
                                 "seeding"     => Some(TorrentState::Seeding),
-                                "paused"      => Some(TorrentState::Paused),
+                                // Engine reports "paused" for BOTH user-paused and
+                                // queued torrents. Preserve whichever the record
+                                // already holds; never downgrade Queued -> Paused.
+                                "paused" => Some(match rec.state {
+                                    TorrentState::Queued => TorrentState::Queued,
+                                    _ => TorrentState::Paused,
+                                }),
                                 "stalled"     => Some(TorrentState::Stalled),
                                 "completed"   => Some(TorrentState::Completed),
                                 _             => None, // initializing/error/etc. — don't persist
@@ -144,6 +157,13 @@ fn main() {
                                     rec.state = s;
                                     let _ = state_for_emit.upsert(rec);
                                 }
+                            }
+                            // A finished download frees a slot — let the queue advance.
+                            if matches!(u.state_label.as_str(), "seeding" | "completed") {
+                                drift::queue::reconcile(
+                                    &engine_for_emit, &state_for_emit,
+                                    settings_for_emit.get().max_active_downloads,
+                                ).await;
                             }
                         }
                     }

@@ -82,6 +82,7 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
 
     let ih = ctx.engine.start(src, &save_path, req.selected_files.clone()).await.map_err(|e| e.to_string())?;
 
+    let pos = ctx.state.next_queue_position();
     ctx.state.upsert(TorrentRecord {
         infohash: ih.as_str().into(),
         display_name: meta.name.clone(),
@@ -90,8 +91,11 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
         added_at: chrono_now_ms(),
         total_size: meta.total_size,
         selected_files: req.selected_files,
-        queue_position: 0, forced: false, dl_limit: 0, ul_limit: 0,
+        queue_position: pos, forced: false, dl_limit: 0, ul_limit: 0,
     }).map_err(|e| e.to_string())?;
+
+    let max_active = ctx.settings.get().max_active_downloads;
+    crate::queue::reconcile(&ctx.engine, &ctx.state, max_active).await;
 
     Ok(ih.as_str().into())
 }
@@ -101,18 +105,25 @@ pub async fn pause(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<()
     ctx.engine.pause(&InfoHash(infohash.clone())).await.map_err(|e| e.to_string())?;
     if let Some(mut r) = ctx.state.snapshot().torrents.into_iter().find(|t| t.infohash == infohash) {
         r.state = TorrentState::Paused;
+        r.forced = false; // pausing clears any forced flag
         ctx.state.upsert(r).map_err(|e| e.to_string())?;
     }
+    // A freed slot may let a queued torrent advance.
+    let max_active = ctx.settings.get().max_active_downloads;
+    crate::queue::reconcile(&ctx.engine, &ctx.state, max_active).await;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn resume(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(), String> {
-    ctx.engine.resume(&InfoHash(infohash.clone())).await.map_err(|e| e.to_string())?;
     if let Some(mut r) = ctx.state.snapshot().torrents.into_iter().find(|t| t.infohash == infohash) {
-        r.state = TorrentState::Downloading;
-        ctx.state.upsert(r).map_err(|e| e.to_string())?;
+        if matches!(r.state, TorrentState::Paused) {
+            r.state = TorrentState::Queued; // provisional; reconcile may promote to Downloading
+            ctx.state.upsert(r).map_err(|e| e.to_string())?;
+        }
     }
+    let max_active = ctx.settings.get().max_active_downloads;
+    crate::queue::reconcile(&ctx.engine, &ctx.state, max_active).await;
     Ok(())
 }
 

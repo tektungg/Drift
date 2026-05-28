@@ -69,6 +69,43 @@ pub fn decide(items: &[QueueItem], max_active: u32) -> QueuePlan {
     plan
 }
 
+use crate::engine::Engine;
+use crate::magnet::InfoHash;
+use crate::state::{StateStore, TorrentState};
+use std::sync::Arc;
+
+/// Build `decide()` inputs from the persisted state.
+pub fn build_items(state: &StateStore) -> Vec<QueueItem> {
+    state.snapshot().torrents.iter().map(|r| QueueItem {
+        infohash: r.infohash.clone(),
+        desired: if matches!(r.state, TorrentState::Paused) { Desired::Pause } else { Desired::Run },
+        forced: r.forced,
+        position: r.queue_position,
+        finished: matches!(r.state, TorrentState::Seeding | TorrentState::Completed),
+        running_now: matches!(r.state, TorrentState::Downloading | TorrentState::Stalled),
+    }).collect()
+}
+
+/// Recompute the plan and apply it: unpause `to_start` (→ Downloading), pause
+/// `to_pause` (→ Queued). Persists the resulting state labels.
+pub async fn reconcile(engine: &Engine, state: &Arc<StateStore>, max_active: u32) {
+    let plan = decide(&build_items(state), max_active);
+    for ih in &plan.to_start {
+        if engine.resume(&InfoHash(ih.clone())).await.is_ok() {
+            if let Some(mut r) = find(state, ih) { r.state = TorrentState::Downloading; let _ = state.upsert(r); }
+        }
+    }
+    for ih in &plan.to_pause {
+        if engine.pause(&InfoHash(ih.clone())).await.is_ok() {
+            if let Some(mut r) = find(state, ih) { r.state = TorrentState::Queued; let _ = state.upsert(r); }
+        }
+    }
+}
+
+fn find(state: &StateStore, ih: &str) -> Option<crate::state::TorrentRecord> {
+    state.snapshot().torrents.into_iter().find(|t| t.infohash == ih)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
