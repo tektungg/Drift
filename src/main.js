@@ -16,6 +16,7 @@ const FILTERS = [
   { key: "seeding", label: "Seeding" },
   { key: "completed", label: "Completed" },
   { key: "paused", label: "Paused" },
+  { key: "queued", label: "Queued" },
 ];
 let currentFilter = "all";
 let searchQuery = "";
@@ -52,7 +53,7 @@ function renderSidebar() {
   }
   let down = 0, up = 0;
   for (const t of torrents) { down += t.down_bps; up += t.up_bps; }
-  const iconKey = { all: "all", downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused" };
+  const iconKey = { all: "all", downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused", queued: "downloading" };
   el.innerHTML = FILTERS.map(f => `
     <div class="side-item ${currentFilter === f.key ? 'active' : ''}" data-key="${f.key}">
       <span class="ic">${icon(iconKey[f.key])}</span>
@@ -90,7 +91,7 @@ function emptyStateHtml() {
       </div>
     </div>`;
   }
-  const labels = { downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused" };
+  const labels = { downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused", queued: "queued" };
   return `<div class="empty">
     <div class="glyph">${icon("wave")}</div>
     <h3>Nothing ${labels[currentFilter] || "here"} right now</h3>
@@ -670,10 +671,17 @@ function openContextMenu(ih, x, y) {
     t.state_label === "paused"
       ? { label: "Resume", fn: () => invoke("resume", { infohash: ih }) }
       : { label: "Pause",  fn: () => invoke("pause",  { infohash: ih }) },
+    ...((t.state_label === "queued" || t.state_label === "paused")
+        ? [{ label: "Force start", fn: () => invoke("force_start", { infohash: ih }) }]
+        : []),
     { label: "Open folder", fn: () => invoke("open_folder", { infohash: ih }) },
     { label: "Copy magnet",
       fn: () => invoke("copy_magnet", { infohash: ih }),
       onSuccess: () => showToast("info", "Magnet copied to clipboard.") },
+    { label: "Move to top",    fn: () => invoke("move_in_queue", { infohash: ih, dir: "top" }) },
+    { label: "Move up",        fn: () => invoke("move_in_queue", { infohash: ih, dir: "up" }) },
+    { label: "Move down",      fn: () => invoke("move_in_queue", { infohash: ih, dir: "down" }) },
+    { label: "Move to bottom", fn: () => invoke("move_in_queue", { infohash: ih, dir: "bottom" }) },
     { label: "Remove", fn: () => invoke("remove", { infohash: ih, deleteFiles: false }) },
     { label: "Remove + delete files", fn: () => invoke("remove", { infohash: ih, deleteFiles: true }) },
   ];

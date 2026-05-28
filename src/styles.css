@@ -25,6 +25,7 @@
   --hover:          rgba(0,0,0,0.03);
   --scrollbar:       rgba(31,30,29,0.18);
   --scrollbar-hover: rgba(31,30,29,0.32);
+  --st-queued:       #B0A99C;
 }
 
 /* Dark theme — warm charcoal, Claude-style. Applied via data-theme="dark"
@@ -52,6 +53,7 @@
   --hover:          rgba(255,255,255,0.05);
   --scrollbar:       rgba(236,230,218,0.16);
   --scrollbar-hover: rgba(236,230,218,0.30);
+  --st-queued:       #B0A99C;
 }
 * { box-sizing: border-box; }
 
