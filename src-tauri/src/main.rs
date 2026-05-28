@@ -73,6 +73,7 @@ async fn main() {
             commands::copy_magnet,
             commands::torrent_files,
             commands::set_file_selection,
+            commands::focus_main,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

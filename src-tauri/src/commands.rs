@@ -259,6 +259,22 @@ mod helper_tests {
     }
 }
 
+/// Bring the main window forward (used by the magnet-toast popup when the
+/// user accepts a detected magnet — we want the focus to land on the Add
+/// Torrent dialog that opens next).
+#[tauri::command]
+pub fn focus_main(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(w) = app.get_webview_window("main") {
+        w.show().map_err(|e| e.to_string())?;
+        // If the window was minimized to the tray or otherwise iconified,
+        // bring it back to its normal size before focusing.
+        let _ = w.unminimize();
+        w.set_focus().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn open_folder(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(), String> {
     let snap = ctx.state.snapshot();

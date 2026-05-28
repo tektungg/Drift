@@ -1,11 +1,14 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="styles.css"></head>
 <body style="padding: 14px 16px;">
-  <div id="t-name" style="font-size:13px; margin-bottom:8px; white-space:nowrap;
-       overflow:hidden; text-overflow:ellipsis;">Magnet detected</div>
+  <div style="font-size:13px; margin-bottom:4px; color: var(--ink);">
+    Magnet link detected. Do you want to download this?
+  </div>
+  <div id="t-name" style="font-size:11px; margin-bottom:10px; color: var(--ink-soft);
+       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
   <div style="display:flex; gap:8px; justify-content:flex-end">
     <button class="btn-ghost" id="t-dismiss">Dismiss</button>
-    <button class="btn-primary" id="t-add">Add</button>
+    <button class="btn-primary" id="t-add">Yes</button>
   </div>
   <script type="module" src="toast.js"></script>
 </body></html>
