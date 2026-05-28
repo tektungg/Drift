@@ -265,14 +265,18 @@ async function openAddDialog(initialSource = "") {
 
   function renderMeta() {
     if (!lastMeta) return;
-    const filesHtml = lastMeta.files.map((f, i) => `
+    const filesHtml = lastMeta.files.map((f, i) => {
+      const cat = extToCategory(f.path) ?? "other";
+      return `
       <div class="file-row">
-        <label style="display:flex; gap:8px; align-items:center">
+        <label style="display:flex; gap:8px; align-items:center; flex:1; min-width:0">
           <input type="checkbox" data-i="${i}" ${selected.includes(i) ? "checked" : ""}>
-          <span>${escape(f.path)}</span>
+          <span class="ficon ${cat}" style="width:20px;height:20px;border-radius:5px">${icon(cat)}</span>
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escape(f.path)}</span>
         </label>
-        <span>${fmtBytes(f.size)}</span>
-      </div>`).join("");
+        <span style="flex-shrink:0">${fmtBytes(f.size)}</span>
+      </div>`;
+    }).join("");
     const displayPath = overridePath ?? lastMeta.predicted_save_path;
     const customLabel = overridePath ? " (custom)" : "";
     meta.innerHTML = `
