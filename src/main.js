@@ -51,10 +51,38 @@ function renderSidebar() {
   el.querySelector("#side-settings").onclick = () => toggleSettings();
 }
 
+function emptyStateHtml() {
+  if (currentFilter === "all") {
+    return `<div class="empty">
+      <div class="glyph">${icon("wave")}</div>
+      <h3>Nothing downloading yet</h3>
+      <p>Three ways to get started:</p>
+      <div class="hints">
+        <div class="hint"><span class="hic">${icon("link")}</span>
+          <div><b>Paste a magnet link</b> — Drift watches your clipboard and offers to add it.</div></div>
+        <div class="hint"><span class="hic">${icon("document")}</span>
+          <div><b>Drop a .torrent file</b> — drag it anywhere onto this window.</div></div>
+        <div class="hint"><span class="hic">${icon("plus")}</span>
+          <div><b>Click Add torrent</b> — paste or browse in the dialog.</div></div>
+      </div>
+    </div>`;
+  }
+  const labels = { downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused" };
+  return `<div class="empty">
+    <div class="glyph">${icon("wave")}</div>
+    <h3>Nothing ${labels[currentFilter] || "here"} right now</h3>
+    <p>Torrents will show up here when they enter this state.</p>
+  </div>`;
+}
+
 function renderList() {
   const list = document.getElementById("torrent-list");
   const filtered = currentFilter === "all" ? torrents
     : torrents.filter(t => t.state_label === currentFilter);
+  if (filtered.length === 0) {
+    list.innerHTML = emptyStateHtml();
+    return;
+  }
   list.innerHTML = filtered.map(t => rowHtml(t)).join("");
   list.querySelectorAll(".torrent-row").forEach(n => {
     n.onclick = () => { toggleExpand(n.dataset.ih); };
