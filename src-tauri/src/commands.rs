@@ -135,7 +135,11 @@ pub async fn remove(ctx: tauri::State<'_, AppCtx>, infohash: String, delete_file
     let engine_result = ctx.engine.remove(&InfoHash(infohash.clone()), delete_files).await;
     let state_result = ctx.state.remove(&infohash);
     engine_result.map_err(|e| e.to_string())?;
-    state_result.map_err(|e| e.to_string())
+    state_result.map_err(|e| e.to_string())?;
+    // Removing a torrent frees a download slot — let a queued one advance.
+    let max_active = ctx.settings.get().max_active_downloads;
+    crate::queue::reconcile(&ctx.engine, &ctx.state, max_active).await;
+    Ok(())
 }
 
 #[tauri::command]
@@ -558,8 +562,12 @@ pub async fn torrent_files(ctx: tauri::State<'_, AppCtx>, infohash: String) -> R
 pub async fn force_start(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(), String> {
     if let Some(mut r) = ctx.state.snapshot().torrents.into_iter().find(|t| t.infohash == infohash) {
         r.forced = true;
-        if matches!(r.state, TorrentState::Paused | TorrentState::Queued) {
-            r.state = TorrentState::Downloading; // provisional; reconcile confirms
+        // Move out of user-Paused to Queued (not Downloading) so build_items treats
+        // it as eligible (Desired::Run); reconcile then actually starts it and sets
+        // Downloading only after engine.resume succeeds — avoiding a false
+        // "Downloading" record if the engine call fails.
+        if matches!(r.state, TorrentState::Paused) {
+            r.state = TorrentState::Queued;
         }
         ctx.state.upsert(r).map_err(|e| e.to_string())?;
     }
