@@ -46,14 +46,15 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .btn-ghost { background: transparent; border: 1px solid var(--line); padding: 6px 12px; border-radius: 7px;
   color: var(--ink); cursor: pointer; font-size: 13px; }
 .torrent-row { padding: 14px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.torrent-row:hover { background: rgba(0,0,0,0.02); }
 .torrent-row .name { margin-bottom: 6px; }
 .torrent-row .meta { font-size: 11px; color: var(--ink-soft); margin-top: 6px; }
-.progress { height: 6px; background: var(--accent-soft); border-radius: 99px; overflow: hidden; }
+.progress { height: 6px; background: var(--prog-track); border-radius: 99px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); transition: width 0.3s ease; }
-.row-grid { display: grid; grid-template-columns: 1fr 80px; column-gap: 16px; align-items: center; }
+.row-grid { display: grid; grid-template-columns: auto 1fr 90px; column-gap: 12px; align-items: center; }
 .row-grid .right { text-align: right; }
 .row-grid .right .pct { font-weight: 500; }
-.row-grid .right .state { font-size: 11px; color: var(--ink-soft); }
+.row-grid .right .state { font-size: 11px; display: flex; align-items: center; justify-content: flex-end; }
 .expanded-files { margin-top: 12px; padding: 10px 14px; background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--radius); }
 .file-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; color: var(--ink-soft); }
@@ -151,3 +152,4 @@ input[type=text], textarea, select {
   padding: 9px 0; border-bottom: 1px solid var(--line); gap: 12px; }
 .settings-row:last-child { border-bottom: 0; }
 .settings-row .num { width: 90px; text-align: right; }
+.file-row .ficon svg { width: 12px; height: 12px; }

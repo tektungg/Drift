@@ -1,5 +1,6 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
 import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
+import { ICONS, icon, extToCategory } from "./icons.js";
 
 // NOTE: production builds should vendor these via npm + a bundler. For
 // development MVP, CDN imports keep the surface minimal. If CSP blocks them,
@@ -62,14 +63,22 @@ function renderList() {
 
 function rowHtml(t) {
   const pct = t.total > 0 ? Math.floor(100 * t.downloaded / t.total) : 0;
+  const ic = iconForTorrent(t);
+  const stClass = "st-" + (t.state_label || "downloading");
+  const stColorVar = `var(--st-${t.state_label || "downloading"}, var(--accent))`;
+  const label = (t.state_label || "downloading").replace(/^\w/, c => c.toUpperCase());
   return `<div class="torrent-row" data-ih="${t.infohash}">
     <div class="row-grid">
+      <div class="ficon ${ic.cat}">${icon(ic.key)}</div>
       <div>
         <div class="name">${escape(t.name)}</div>
-        <div class="progress"><div style="width:${pct}%"></div></div>
-        <div class="meta">${fmtBytes(t.downloaded)} / ${fmtBytes(t.total)} · ${fmtBps(t.down_bps)} · ${t.peers} peers</div>
+        <div class="progress"><div style="width:${pct}%; background:${stColorVar}"></div></div>
+        <div class="meta">${escape(metaLine(t))}</div>
       </div>
-      <div class="right"><div class="pct">${pct}%</div><div class="state">${t.state_label}</div></div>
+      <div class="right">
+        <div class="pct">${pct}%</div>
+        <div class="state ${stClass}"><span class="state-dot"></span>${label}</div>
+      </div>
     </div>
     ${expanded.has(t.infohash) ? renderExpanded(t) : ""}
   </div>`;
@@ -84,22 +93,23 @@ function renderExpanded(t) {
       const files = await invoke("torrent_files", { infohash: t.infohash });
       el.innerHTML = files.map(f => {
         const pct = f.size > 0 ? Math.floor(100 * f.downloaded / f.size) : 0;
+        const cat = extToCategory(f.path) ?? "other";
         return `<div class="file-row">
-          <label style="display:flex; gap:8px; align-items:center; flex:1;">
+          <label style="display:flex; gap:8px; align-items:center; flex:1; min-width:0;">
             <input type="checkbox" data-i="${f.index}" ${f.selected ? "checked" : ""}>
-            <span>${escape(f.path)}</span>
+            <span class="ficon ${cat}" style="width:20px;height:20px;border-radius:5px">${icon(cat)}</span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escape(f.path)}</span>
           </label>
-          <span>${pct}% · ${fmtBytes(f.size)}</span>
+          <span style="flex-shrink:0">${pct}% · ${fmtBytes(f.size)}</span>
         </div>`;
       }).join("");
-      // Mid-download deselect: when any checkbox changes, send the new selection set
       el.querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = async () => {
         const sel = [...el.querySelectorAll("input[type=checkbox]:checked")].map(x => +x.dataset.i);
         try { await invoke("set_file_selection", { infohash: t.infohash, selected: sel }); }
         catch (e) { showToast("error", friendlyError(e)); cb.checked = !cb.checked; }
       });
     } catch (e) {
-      el.innerHTML = `<div class="file-row">Couldn't load files: ${e}</div>`;
+      el.innerHTML = `<div class="file-row">Couldn't load files: ${escape(String(e))}</div>`;
     }
   }, 0);
   return `<div class="expanded-files" id="${id}"><div class="file-row">Loading file list…</div></div>`;
@@ -129,6 +139,36 @@ function escape(s) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+// Pick a file-type icon for a torrent row. Rows only know the torrent name,
+// so use its extension when present, else fall back to a folder icon.
+function iconForTorrent(t) {
+  const cat = extToCategory(t.name);
+  return { key: cat ?? "folder", cat: cat ?? "folder" };
+}
+
+// Human ETA from remaining bytes / current speed.
+function fmtEta(t) {
+  if (!t.down_bps || t.down_bps <= 0) return "—";
+  const remaining = Math.max(0, (t.total || 0) - (t.downloaded || 0));
+  if (remaining === 0) return "—";
+  let s = Math.round(remaining / t.down_bps);
+  if (s < 60) return "<1m";
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// Build the right-aligned meta line per state.
+function metaLine(t) {
+  if (t.state_label === "seeding" || t.state_label === "completed") {
+    return `${fmtBytes(t.total)} · ↑ ${fmtBps(t.up_bps)} · ${t.peers} peers`;
+  }
+  if (t.state_label === "paused") {
+    return `${fmtBytes(t.downloaded)} / ${fmtBytes(t.total)} · paused`;
+  }
+  return `${fmtBytes(t.downloaded)} / ${fmtBytes(t.total)} · ${fmtBps(t.down_bps)} · ${t.peers} peers · ETA ${fmtEta(t)}`;
 }
 
 function friendlyError(e) {
