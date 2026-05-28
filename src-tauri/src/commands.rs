@@ -43,6 +43,7 @@ pub async fn snapshot(ctx: tauri::State<'_, AppCtx>) -> Result<Vec<TorrentDto>, 
             TorrentState::Paused => "paused",
             TorrentState::Completed => "completed",
             TorrentState::Stalled => "stalled",
+            TorrentState::Queued => "queued",
         }.into(),
     }).collect())
 }
@@ -89,6 +90,7 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
         added_at: chrono_now_ms(),
         total_size: meta.total_size,
         selected_files: req.selected_files,
+        queue_position: 0, forced: false, dl_limit: 0, ul_limit: 0,
     }).map_err(|e| e.to_string())?;
 
     Ok(ih.as_str().into())

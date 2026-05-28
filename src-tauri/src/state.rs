@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum TorrentState { Downloading, Seeding, Paused, Completed, Stalled }
+pub enum TorrentState { Downloading, Seeding, Paused, Completed, Stalled, Queued }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentRecord {
@@ -16,6 +16,10 @@ pub struct TorrentRecord {
     pub added_at: i64,
     pub total_size: u64,
     pub selected_files: Option<Vec<usize>>,
+    #[serde(default)] pub queue_position: u32,
+    #[serde(default)] pub forced: bool,
+    #[serde(default)] pub dl_limit: u32,
+    #[serde(default)] pub ul_limit: u32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -59,6 +63,13 @@ impl StateStore {
         self.inner.lock().unwrap().torrents.iter().any(|t| t.infohash == infohash)
     }
 
+    /// Highest existing queue_position + 1 (0 if empty). New torrents append to
+    /// the end of the queue.
+    pub fn next_queue_position(&self) -> u32 {
+        self.inner.lock().unwrap().torrents.iter()
+            .map(|t| t.queue_position).max().map(|m| m + 1).unwrap_or(0)
+    }
+
     fn flush(&self, s: &PersistedState) -> Result<()> {
         let tmp = self.path.with_extension("json.tmp");
         std::fs::write(&tmp, serde_json::to_vec_pretty(s)?)?;
@@ -79,6 +90,7 @@ mod tests {
             save_path: PathBuf::from("C:/"),
             state: TorrentState::Downloading,
             added_at: 0, total_size: 0, selected_files: None,
+            queue_position: 0, forced: false, dl_limit: 0, ul_limit: 0,
         }
     }
 
@@ -116,5 +128,28 @@ mod tests {
         s.upsert(rec("aaa")).unwrap();
         assert!(s.contains("aaa"));
         assert!(!s.contains("bbb"));
+    }
+
+    #[test]
+    fn legacy_record_loads_with_defaults() {
+        // A record written before the queue fields existed must still deserialize.
+        let json = r#"{"torrents":[{"infohash":"aaa","display_name":"x",
+            "save_path":"C:/","state":"downloading","added_at":0,"total_size":0,
+            "selected_files":null}]}"#;
+        let s: PersistedState = serde_json::from_str(json).unwrap();
+        assert_eq!(s.torrents.len(), 1);
+        assert_eq!(s.torrents[0].queue_position, 0);
+        assert_eq!(s.torrents[0].forced, false);
+        assert_eq!(s.torrents[0].dl_limit, 0);
+        assert_eq!(s.torrents[0].ul_limit, 0);
+    }
+
+    #[test]
+    fn queued_state_serde_roundtrips() {
+        let st = TorrentState::Queued;
+        let j = serde_json::to_string(&st).unwrap();
+        assert_eq!(j, "\"queued\"");
+        let back: TorrentState = serde_json::from_str(&j).unwrap();
+        assert_eq!(back, TorrentState::Queued);
     }
 }
