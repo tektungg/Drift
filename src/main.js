@@ -1,6 +1,7 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
 import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
 import { icon, extToCategory } from "./icons.js";
+import { filterTorrents, sortTorrents } from "./list-ops.js";
 
 // NOTE: production builds should vendor these via npm + a bundler. For
 // development MVP, CDN imports keep the surface minimal. If CSP blocks them,
@@ -17,6 +18,9 @@ const FILTERS = [
   { key: "paused", label: "Paused" },
 ];
 let currentFilter = "all";
+let searchQuery = "";
+let sortKey = localStorage.getItem("drift-sort-key") || "added";
+let sortDir = localStorage.getItem("drift-sort-dir") || "desc";
 let torrents = [];  // [{infohash, name, downloaded, total, down_bps, up_bps, peers, state_label}]
 let expanded = new Set();
 
@@ -94,8 +98,10 @@ function emptyStateHtml() {
 
 function renderList() {
   const list = document.getElementById("torrent-list");
-  const filtered = currentFilter === "all" ? torrents
-    : torrents.filter(t => t.state_label === currentFilter);
+  const filtered = sortTorrents(
+    filterTorrents(torrents, currentFilter, searchQuery),
+    sortKey, sortDir
+  );
   if (filtered.length === 0) {
     list.innerHTML = emptyStateHtml();
     return;
@@ -244,6 +250,25 @@ function toggleExpand(ih) {
 }
 
 function renderAll() { renderSidebar(); renderList(); }
+
+function wireListControls() {
+  const search = document.getElementById("list-search");
+  const sortSel = document.getElementById("list-sort");
+  const dirBtn = document.getElementById("list-sortdir");
+  if (!search || !sortSel || !dirBtn) return;
+  sortSel.value = sortKey;
+  dirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
+  search.addEventListener("input", () => { searchQuery = search.value; renderList(); });
+  sortSel.addEventListener("change", () => {
+    sortKey = sortSel.value; localStorage.setItem("drift-sort-key", sortKey); renderList();
+  });
+  dirBtn.addEventListener("click", () => {
+    sortDir = sortDir === "asc" ? "desc" : "asc";
+    localStorage.setItem("drift-sort-dir", sortDir);
+    dirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
+    renderList();
+  });
+}
 
 function fmtBytes(n) {
   if (n < 1024) return `${n} B`;
@@ -638,6 +663,7 @@ window.addEventListener("focus", async () => {
     torrents = [];
   }
   renderAll();
+  wireListControls();
   await listen("progress", (e) => applyProgress(e.payload));
   // If Drift was cold-launched from a magnet/.torrent (e.g. a magnet clicked
   // in a browser), the source was stashed in Rust — pull it now that our

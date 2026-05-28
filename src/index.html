@@ -23,6 +23,17 @@
     <main class="main">
       <div class="main-head">
         <h1 id="main-title">All downloads</h1>
+        <div class="list-controls">
+          <input type="text" id="list-search" class="list-search" placeholder="Search…" autocomplete="off" spellcheck="false">
+          <select id="list-sort" class="list-sort" title="Sort by">
+            <option value="added">Date added</option>
+            <option value="name">Name</option>
+            <option value="progress">Progress</option>
+            <option value="speed">Speed</option>
+            <option value="size">Size</option>
+          </select>
+          <button id="list-sortdir" class="list-sortdir" title="Toggle direction">↓</button>
+        </div>
         <button class="btn-primary" id="btn-add">+ Add torrent</button>
       </div>
       <div id="torrent-list"></div>

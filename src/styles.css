@@ -226,3 +226,15 @@ input[type=text], textarea, select {
 .seg-btn:hover { color: var(--ink); }
 .seg-btn svg { width: 15px; height: 15px; }
 .seg-btn.active { background: var(--accent-soft); color: var(--accent); }
+
+.list-controls { display: flex; align-items: center; gap: 8px; }
+.list-search, .list-sort, .list-sortdir {
+  height: 34px; box-sizing: border-box;
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 8px; font-size: 13px; font-family: var(--font-sans);
+}
+.list-search { padding: 0 10px; width: 180px; transition: border-color .12s ease, width .12s ease; }
+.list-search:focus { outline: none; border-color: var(--accent); width: 220px; }
+.list-sort { padding: 0 8px; cursor: pointer; }
+.list-sortdir { padding: 0 11px; cursor: pointer; line-height: 1; }
+.list-sortdir:hover, .list-sort:hover { border-color: var(--accent); }
