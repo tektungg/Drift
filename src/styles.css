@@ -63,7 +63,8 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .side-settings { padding: 8px 11px; border-radius: var(--radius-sm); color: var(--ink-soft); cursor: pointer;
   font-size: 13px; display: flex; align-items: center; gap: 9px; }
 .side-settings:hover { background: var(--hover); color: var(--ink); }
-.main { padding: 20px 24px; overflow-y: auto; }
+.main { padding: 20px 24px; overflow-y: auto; display: flex; flex-direction: column; }
+#torrent-list { flex: 1 1 auto; min-height: 0; }
 .main-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .main-head h1 { font-family: var(--font-serif); font-size: 18px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
 .btn-primary { background: var(--accent); color: white; border: 0; padding: 7px 14px; border-radius: 7px;
@@ -141,7 +142,7 @@ input[type=text], textarea, select {
 
 /* Empty state */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 36px 20px 60px; }
+  text-align: center; padding: 24px 20px; height: 100%; box-sizing: border-box; }
 .empty .glyph { width: 64px; height: 64px; border-radius: 16px; background: var(--accent-soft);
   color: var(--accent); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
 .empty .glyph svg { width: 32px; height: 32px; }
