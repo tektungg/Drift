@@ -209,13 +209,13 @@ async function openAddDialog(initialSource = "") {
     meta.innerHTML = `
       <div style="color:var(--ink); margin-bottom:6px">${escape(lastMeta.name)}</div>
       <div>${fmtBytes(lastMeta.total_size)} total · ${lastMeta.files.length} file(s)</div>
-      <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
-        <span>Will go to</span>
-        <code style="word-break:break-all; flex:1; min-width:0">${escape(displayPath)}</code>
+      <div style="margin-top:8px; display:flex; align-items:center; gap:8px">
+        <span style="flex-shrink:0">Will go to</span>
+        <code class="path-trunc" title="${escape(displayPath)}"><bdi>${escape(displayPath)}</bdi></code>
         <button class="btn-ghost" id="change-folder"
-                style="padding:3px 10px; font-size:11px">Change…</button>
+                style="padding:3px 10px; font-size:11px; flex-shrink:0">Change…</button>
         ${overridePath ? `<button class="btn-ghost" id="reset-folder"
-                style="padding:3px 10px; font-size:11px">Reset</button>` : ""}
+                style="padding:3px 10px; font-size:11px; flex-shrink:0">Reset</button>` : ""}
       </div>
       <div style="font-size:11px; color:var(--ink-soft); margin-top:2px">
         ${customLabel ? `Custom location · ` : `Auto-categorized · `}you can change it here or in Settings.
