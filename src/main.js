@@ -130,10 +130,22 @@ function rowHtml(t) {
   </div>`;
 }
 
+// Detail line shown at the top of an expanded row.
+function detailLine(t) {
+  const dl = t.downloaded || 0, up = t.uploaded || 0;
+  const ratio = dl > 0 ? (up / dl).toFixed(2) : "0.00";
+  const added = t.added_at
+    ? new Date(t.added_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+    : "—";
+  const eta = (t.state_label === "downloading" || t.state_label === "stalled") ? fmtEta(t) : "—";
+  return `${t.peers || 0} peers · ratio ${ratio} · ↑ ${fmtBytes(up)} · added ${escape(added)} · ETA ${eta}`;
+}
+
 function renderExpanded(t) {
   const id = "exp-" + t.infohash;
+  const filesId = "expf-" + t.infohash;
   setTimeout(async () => {
-    const el = document.getElementById(id);
+    const el = document.getElementById(filesId);
     if (!el) return;
     try {
       const files = await invoke("torrent_files", { infohash: t.infohash });
@@ -158,7 +170,10 @@ function renderExpanded(t) {
       el.innerHTML = `<div class="file-row">Couldn't load files: ${escape(String(e))}</div>`;
     }
   }, 0);
-  return `<div class="expanded-files" id="${id}"><div class="file-row">Loading file list…</div></div>`;
+  return `<div class="expanded-files" id="${id}">
+    <div class="exp-detail">${detailLine(t)}</div>
+    <div id="${filesId}"><div class="file-row">Loading file list…</div></div>
+  </div>`;
 }
 
 function toggleExpand(ih) {
@@ -244,6 +259,9 @@ async function openAddDialog(initialSource = "") {
       <div class="modal">
         <h2>Add torrent</h2>
         <textarea id="addsrc" rows="3" style="resize:none" placeholder="Paste a magnet link or drop a .torrent file"></textarea>
+        <div style="margin-top:8px">
+          <button class="btn-ghost" id="addbrowse" style="font-size:12px; padding:5px 11px">Browse for a .torrent file…</button>
+        </div>
         <div id="addmeta" style="margin-top:14px; min-height:80px; font-size:13px; color:var(--ink-soft)"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px">
           <button class="btn-ghost" id="addcancel">Cancel</button>
@@ -351,6 +369,12 @@ async function openAddDialog(initialSource = "") {
     clearTimeout(fetchTimer);
     fetchTimer = setTimeout(refresh, 500);
   });
+  document.getElementById("addbrowse").onclick = async () => {
+    try {
+      const p = await invoke("pick_torrent_file");
+      if (p) { ta.value = p; refresh(); }
+    } catch (e) { showToast("error", friendlyError(e)); }
+  };
   document.getElementById("addcancel").onclick = () => root.innerHTML = "";
   document.getElementById("addconfirm").onclick = async () => {
     const original = btn.textContent;
@@ -411,6 +435,8 @@ async function toggleSettings() {
         <button class="switch ${cfg.close_to_tray ? "" : "off"}" id="s-tray" data-on="${cfg.close_to_tray}"></button></div>
       <div class="settings-row"><span>Start with Windows</span>
         <button class="switch ${cfg.start_with_windows ? "" : "off"}" id="s-startup" data-on="${cfg.start_with_windows}"></button></div>
+      <div class="settings-row"><span>Open magnet links with Drift</span>
+        <button class="switch ${cfg.magnet_handler ? "" : "off"}" id="s-magnet" data-on="${!!cfg.magnet_handler}"></button></div>
     </div>
 
     <details class="settings-group">
@@ -454,6 +480,7 @@ async function toggleSettings() {
       clipboard_watch: isOn("s-clip"),
       close_to_tray: isOn("s-tray"),
       start_with_windows: isOn("s-startup"),
+      magnet_handler: isOn("s-magnet"),
       theme: themeBtn ? themeBtn.dataset.val : "system",
       category_map: Object.fromEntries(
         ["video","audio","documents","compressed","programs","images"].map(k =>

@@ -75,6 +75,7 @@ async fn main() {
             commands::set_file_selection,
             commands::focus_main,
             commands::pick_folder,
+            commands::pick_torrent_file,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -90,6 +91,7 @@ async fn main() {
                     let snap = state_for_emit.snapshot();
                     let rec_opt = snap.torrents.iter().find(|t| t.infohash == ih_str).cloned();
                     let name = rec_opt.as_ref().map(|r| r.display_name.clone()).unwrap_or_default();
+                    let added_at = rec_opt.as_ref().map(|r| r.added_at).unwrap_or(0);
 
                     // Persist state transitions so the sidebar counts reflect reality across restarts.
                     let prev_emitted = last_state_label.get(&ih_str).cloned();
@@ -116,9 +118,10 @@ async fn main() {
                     let dto = TorrentDto {
                         infohash: ih_str,
                         name,
-                        downloaded: u.downloaded, total: u.total,
+                        downloaded: u.downloaded, total: u.total, uploaded: u.uploaded,
                         down_bps: u.down_bps, up_bps: u.up_bps,
-                        peers: u.peers, state_label: u.state_label,
+                        peers: u.peers, added_at,
+                        state_label: u.state_label,
                     };
                     let _ = handle.emit("progress", dto);
                 }

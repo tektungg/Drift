@@ -16,8 +16,9 @@ pub struct AppCtx {
 pub async fn snapshot(ctx: tauri::State<'_, AppCtx>) -> Result<Vec<TorrentDto>, String> {
     let snap = ctx.state.snapshot();
     Ok(snap.torrents.into_iter().map(|r| TorrentDto {
+        downloaded: 0, total: r.total_size, uploaded: 0, down_bps: 0, up_bps: 0, peers: 0,
+        added_at: r.added_at,
         infohash: r.infohash, name: r.display_name,
-        downloaded: 0, total: r.total_size, down_bps: 0, up_bps: 0, peers: 0,
         state_label: match r.state {
             TorrentState::Downloading => "downloading",
             TorrentState::Seeding => "seeding",
@@ -145,9 +146,10 @@ pub fn get_settings(ctx: tauri::State<'_, AppCtx>) -> serde_json::Value {
 pub fn set_settings(ctx: tauri::State<'_, AppCtx>, value: serde_json::Value) -> Result<(), String> {
     let cfg: crate::settings::Config = serde_json::from_value(value).map_err(|e| e.to_string())?;
 
-    // Apply the fallible side-effect (registry write) first. If it fails, no UI/runtime
+    // Apply the fallible side-effects (registry writes) first. If they fail, no UI/runtime
     // state has been mutated yet, so the user can see the error and try again cleanly.
     apply_startup_registration(cfg.start_with_windows).map_err(|e| e.to_string())?;
+    apply_magnet_handler(cfg.magnet_handler).map_err(|e| e.to_string())?;
 
     // Then persist to disk (also fallible). If this fails we've registered the Run key but
     // the saved config doesn't reflect it — minor inconsistency, but the next save will
@@ -172,6 +174,33 @@ fn apply_startup_registration(enable: bool) -> anyhow::Result<()> {
         let _ = Command::new("reg").args(["delete",
             r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
             "/v", "Drift", "/f"]).status();
+    }
+    Ok(())
+}
+
+/// Register (or unregister) Drift as the Windows handler for `magnet:` links,
+/// per-user under HKCU (no admin needed). When enabled, clicking a magnet in a
+/// browser launches `Drift.exe "magnet:?..."`; the single-instance + cold-start
+/// argv handlers then open the Add dialog pre-filled.
+///
+/// Note: Windows' per-user "default app" (UserChoice) is hash-protected and
+/// can't be set programmatically. This registers the ProgID + command so Drift
+/// becomes a candidate handler; if another client is already the default, the
+/// user may need to pick Drift under Settings → Apps → Default apps.
+fn apply_magnet_handler(enable: bool) -> anyhow::Result<()> {
+    use std::process::Command;
+    if enable {
+        let exe = std::env::current_exe()?.to_string_lossy().into_owned();
+        Command::new("reg").args(["add", r"HKCU\Software\Classes\magnet",
+            "/ve", "/t", "REG_SZ", "/d", "URL:Magnet Protocol", "/f"]).status()?;
+        Command::new("reg").args(["add", r"HKCU\Software\Classes\magnet",
+            "/v", "URL Protocol", "/t", "REG_SZ", "/d", "", "/f"]).status()?;
+        let cmd = format!("\"{}\" \"%1\"", exe);
+        Command::new("reg").args(["add", r"HKCU\Software\Classes\magnet\shell\open\command",
+            "/ve", "/t", "REG_SZ", "/d", &cmd, "/f"]).status()?;
+    } else {
+        let _ = Command::new("reg").args(["delete",
+            r"HKCU\Software\Classes\magnet", "/f"]).status();
     }
     Ok(())
 }
@@ -407,6 +436,19 @@ mod helper_tests {
     fn sanitize_empty_becomes_untitled() {
         assert_eq!(sanitize_for_windows("..."), "Untitled");
     }
+}
+
+/// Show a native open-file picker filtered to `.torrent` files. Returns the
+/// chosen absolute path, or `None` if the user cancelled.
+#[tauri::command]
+pub fn pick_torrent_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let picked = app.dialog().file()
+        .add_filter("Torrent file", &["torrent"])
+        .blocking_pick_file()
+        .and_then(|fp| fp.into_path().ok())
+        .map(|p| p.to_string_lossy().into_owned());
+    Ok(picked)
 }
 
 /// Show a native folder picker. Returns the chosen absolute path, or

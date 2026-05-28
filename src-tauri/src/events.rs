@@ -6,9 +6,11 @@ pub struct TorrentDto {
     pub name: String,
     pub downloaded: u64,
     pub total: u64,
+    pub uploaded: u64,
     pub down_bps: u64,
     pub up_bps: u64,
     pub peers: u32,
+    pub added_at: i64,
     pub state_label: String,
 }
 

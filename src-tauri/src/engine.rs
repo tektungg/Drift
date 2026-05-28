@@ -46,6 +46,7 @@ pub struct ProgressUpdate {
     pub infohash: InfoHash,
     pub downloaded: u64,
     pub total: u64,
+    pub uploaded: u64,
     pub down_bps: u64,
     pub up_bps: u64,
     pub peers: u32,
@@ -213,6 +214,7 @@ impl Engine {
                 let ih_str = handle.info_hash().as_string();
                 let stats = handle.stats();
                 let total = stats.total_bytes;
+                let uploaded = stats.uploaded_bytes;
 
                 // librqbit's `stats.progress_bytes` is sometimes 0 even when every
                 // file's per-file progress is at 100% — typically when the data
@@ -241,13 +243,13 @@ impl Engine {
 
                 let raw_state = format!("{}", stats.state);
 
-                (ih_str, downloaded, total, down_bps, up_bps, peers, raw_state, finished)
+                (ih_str, downloaded, total, uploaded, down_bps, up_bps, peers, raw_state, finished)
             })
             .collect::<Vec<_>>()
         });
 
         let now = Instant::now();
-        for (ih_str, downloaded, total, down_bps, up_bps, peers, raw_state, finished) in updates {
+        for (ih_str, downloaded, total, uploaded, down_bps, up_bps, peers, raw_state, finished) in updates {
             // Determine the user-visible state label.
             //
             //   finished + live      → "seeding"   (done, actively sharing)
@@ -285,6 +287,7 @@ impl Engine {
                 infohash: InfoHash(ih_str),
                 downloaded,
                 total,
+                uploaded,
                 down_bps,
                 up_bps,
                 peers,

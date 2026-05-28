@@ -16,6 +16,11 @@ pub struct Config {
     /// config.json files written before this field existed still load.
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Register Drift as the Windows handler for magnet: links. Opt-in
+    /// (default false) so installing Drift doesn't hijack the user's
+    /// existing torrent client. Defaulted for backward-compatible configs.
+    #[serde(default)]
+    pub magnet_handler: bool,
     pub category_map: SerCategoryMap,
 }
 
@@ -55,6 +60,7 @@ impl Default for Config {
             start_with_windows: false,
             close_to_tray: true,
             theme: "system".into(),
+            magnet_handler: false,
             category_map: CategoryMap::default().into(),
         }
     }
