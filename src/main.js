@@ -356,47 +356,34 @@ async function toggleSettings() {
   if (panel.classList.contains("open")) { panel.classList.remove("open"); return; }
   const cfg = await invoke("get_settings");
   panel.innerHTML = `
-    <h2 style="font-family:var(--font-serif); margin:0 0 18px; font-size:18px; font-weight:500">Settings</h2>
+    <h2 style="font-family:var(--font-serif); margin:0 0 16px; font-size:18px; font-weight:500">Settings</h2>
 
-    <div class="settings-field">
-      <label>Default download folder</label>
-      <input type="text" id="s-root" value="${escape(cfg.download_root)}">
-    </div>
-
-    <div class="settings-field">
-      <label>Download limit (KB/s, 0 = unlimited)</label>
-      <input type="text" id="s-down" value="${cfg.download_kbps}">
-    </div>
-    <div class="settings-field">
-      <label>Upload limit (KB/s, 0 = unlimited)</label>
-      <input type="text" id="s-up" value="${cfg.upload_kbps}">
+    <div class="settings-group">
+      <div class="group-label">Downloads</div>
+      <div class="settings-row"><span>Default download folder</span></div>
+      <input type="text" id="s-root" value="${escape(cfg.download_root)}" style="margin-bottom:10px">
+      <div class="settings-row"><span>Download limit (KB/s)</span>
+        <input class="num" type="text" id="s-down" value="${cfg.download_kbps}"></div>
+      <div class="settings-row"><span>Upload limit (KB/s)</span>
+        <input class="num" type="text" id="s-up" value="${cfg.upload_kbps}"></div>
     </div>
 
-    <div class="settings-field">
-      <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0">
-        <input type="checkbox" id="s-clip" ${cfg.clipboard_watch ? "checked" : ""}>
-        Watch clipboard for magnet links
-      </label>
-    </div>
-    <div class="settings-field">
-      <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0">
-        <input type="checkbox" id="s-tray" ${cfg.close_to_tray ? "checked" : ""}>
-        Close button hides to tray
-      </label>
-    </div>
-    <div class="settings-field">
-      <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0">
-        <input type="checkbox" id="s-startup" ${cfg.start_with_windows ? "checked" : ""}>
-        Start with Windows
-      </label>
+    <div class="settings-group">
+      <div class="group-label">Behavior</div>
+      <div class="settings-row"><span>Watch clipboard for magnet links</span>
+        <button class="switch ${cfg.clipboard_watch ? "" : "off"}" id="s-clip" data-on="${cfg.clipboard_watch}"></button></div>
+      <div class="settings-row"><span>Close button hides to tray</span>
+        <button class="switch ${cfg.close_to_tray ? "" : "off"}" id="s-tray" data-on="${cfg.close_to_tray}"></button></div>
+      <div class="settings-row"><span>Start with Windows</span>
+        <button class="switch ${cfg.start_with_windows ? "" : "off"}" id="s-startup" data-on="${cfg.start_with_windows}"></button></div>
     </div>
 
-    <details style="margin-top:18px">
-      <summary style="cursor:pointer; font-size:13px; color:var(--ink-soft)">Category extensions</summary>
+    <details class="settings-group">
+      <summary style="cursor:pointer; font-size:10px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-soft)">Category extensions</summary>
       ${["video","audio","documents","compressed","programs","images"].map(k => `
-        <div class="settings-field">
-          <label>${k}</label>
-          <input type="text" id="s-cat-${k}" value="${cfg.category_map[k].join(' ')}">
+        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:6px">
+          <label style="font-size:12px; color:var(--ink-soft)">${k}</label>
+          <input type="text" id="s-cat-${k}" value="${escape(cfg.category_map[k].join(' '))}">
         </div>`).join("")}
     </details>
 
@@ -406,15 +393,23 @@ async function toggleSettings() {
     </div>`;
   panel.classList.add("open");
 
+  // Toggle switches: clicking flips the data-on flag and the .off class.
+  panel.querySelectorAll(".switch").forEach(sw => sw.onclick = () => {
+    const on = sw.dataset.on !== "true";
+    sw.dataset.on = String(on);
+    sw.classList.toggle("off", !on);
+  });
+
   document.getElementById("s-cancel").onclick = () => panel.classList.remove("open");
   document.getElementById("s-save").onclick = async () => {
+    const isOn = id => document.getElementById(id).dataset.on === "true";
     const value = {
       download_root: document.getElementById("s-root").value,
       download_kbps: +document.getElementById("s-down").value || 0,
       upload_kbps: +document.getElementById("s-up").value || 0,
-      clipboard_watch: document.getElementById("s-clip").checked,
-      close_to_tray: document.getElementById("s-tray").checked,
-      start_with_windows: document.getElementById("s-startup").checked,
+      clipboard_watch: isOn("s-clip"),
+      close_to_tray: isOn("s-tray"),
+      start_with_windows: isOn("s-startup"),
       category_map: Object.fromEntries(
         ["video","audio","documents","compressed","programs","images"].map(k =>
           [k, document.getElementById("s-cat-"+k).value.split(/\s+/).filter(Boolean)])),
