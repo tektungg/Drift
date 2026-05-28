@@ -102,9 +102,71 @@ function renderList() {
   }
   list.innerHTML = filtered.map(t => rowHtml(t)).join("");
   list.querySelectorAll(".torrent-row").forEach(n => {
-    n.onclick = () => { toggleExpand(n.dataset.ih); };
+    // Click-to-expand is scoped to the header (.row-grid) only — otherwise a
+    // click on a file checkbox in the expanded area would bubble up and
+    // collapse the row. Right-click anywhere on the row opens the menu.
+    const grid = n.querySelector(".row-grid");
+    if (grid) grid.onclick = () => toggleExpand(n.dataset.ih);
     n.oncontextmenu = (e) => { e.preventDefault(); openContextMenu(n.dataset.ih, e.clientX, e.clientY); };
   });
+}
+
+// Apply a 1 Hz progress update. A change to state_label alters the sidebar
+// counts and filter membership, so that case needs a structural re-render;
+// the common numeric-only tick patches the existing DOM in place to avoid the
+// flicker (and lost hover/focus) of rebuilding the whole list every second.
+function applyProgress(u) {
+  const existing = torrents.find(t => t.infohash === u.infohash);
+  if (!existing) {
+    torrents.push({ name: u.infohash, ...u });
+    renderAll();
+    return;
+  }
+  const prevLabel = existing.state_label;
+  Object.assign(existing, u);
+  if (u.state_label !== prevLabel) { renderAll(); return; }
+  patchRow(existing);
+}
+
+// Surgically update the dynamic bits of a single row without recreating nodes.
+function patchRow(t) {
+  const row = document.querySelector(`.torrent-row[data-ih="${t.infohash}"]`);
+  if (!row) return;  // filtered out of the current view — nothing to patch
+  const pct = t.total > 0 ? Math.floor(100 * t.downloaded / t.total) : 0;
+  const bar = row.querySelector(".progress > div");
+  if (bar) bar.style.width = pct + "%";          // CSS transition animates it
+  const pctEl = row.querySelector(".right .pct");
+  if (pctEl) pctEl.textContent = pct + "%";
+  const metaEl = row.querySelector(".meta");
+  if (metaEl) metaEl.textContent = metaLine(t);
+  const det = row.querySelector(".exp-detail");
+  if (det) {                                       // row is expanded
+    det.innerHTML = detailLine(t);
+    updateFileRows(t);
+  }
+}
+
+// Refresh just the per-file percentages of an expanded row's file list in
+// place — without rebuilding it — so checkboxes, hover and scroll position
+// survive the 1 Hz tick.
+async function updateFileRows(t) {
+  const cont = document.getElementById("expf-" + t.infohash);
+  if (!cont) return;
+  const rows = cont.querySelectorAll(".file-row[data-fi]");
+  if (rows.length === 0) return;  // still loading, or load failed
+  try {
+    const files = await invoke("torrent_files", { infohash: t.infohash });
+    const byIdx = new Map(files.map(f => [f.index, f]));
+    rows.forEach(r => {
+      const f = byIdx.get(+r.dataset.fi);
+      if (!f) return;
+      const span = r.querySelector(".file-pct");
+      if (span) {
+        const p = f.size > 0 ? Math.floor(100 * f.downloaded / f.size) : 0;
+        span.textContent = `${p}% · ${fmtBytes(f.size)}`;
+      }
+    });
+  } catch (e) { /* transient — next tick will retry */ }
 }
 
 function rowHtml(t) {
@@ -152,13 +214,13 @@ function renderExpanded(t) {
       el.innerHTML = files.map(f => {
         const pct = f.size > 0 ? Math.floor(100 * f.downloaded / f.size) : 0;
         const cat = extToCategory(f.path) ?? "other";
-        return `<div class="file-row">
+        return `<div class="file-row" data-fi="${f.index}">
           <label style="display:flex; gap:8px; align-items:center; flex:1; min-width:0;">
             <input type="checkbox" data-i="${f.index}" ${f.selected ? "checked" : ""}>
             <span class="ficon ${cat}" style="width:20px;height:20px;border-radius:5px">${icon(cat)}</span>
             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escape(f.path)}</span>
           </label>
-          <span style="flex-shrink:0">${pct}% · ${fmtBytes(f.size)}</span>
+          <span class="file-pct" style="flex-shrink:0">${pct}% · ${fmtBytes(f.size)}</span>
         </div>`;
       }).join("");
       el.querySelectorAll("input[type=checkbox]").forEach(cb => cb.onchange = async () => {
@@ -576,13 +638,7 @@ window.addEventListener("focus", async () => {
     torrents = [];
   }
   renderAll();
-  await listen("progress", (e) => {
-    const u = e.payload;
-    const existing = torrents.find(t => t.infohash === u.infohash);
-    if (existing) Object.assign(existing, u);
-    else torrents.push({ name: u.infohash, ...u });
-    renderAll();
-  });
+  await listen("progress", (e) => applyProgress(e.payload));
   // If Drift was cold-launched from a magnet/.torrent (e.g. a magnet clicked
   // in a browser), the source was stashed in Rust — pull it now that our
   // listeners and dialog are ready, and open the Add dialog pre-filled.

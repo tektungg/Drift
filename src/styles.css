@@ -72,19 +72,28 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-ghost { background: transparent; border: 1px solid var(--line); padding: 6px 12px; border-radius: 7px;
   color: var(--ink); cursor: pointer; font-size: 13px; }
-.torrent-row { padding: 14px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
-.torrent-row:hover { background: var(--hover); }
+.torrent-row { padding: 4px 0; border-bottom: 1px solid var(--line); }
 .torrent-row .name { margin-bottom: 6px; }
 .torrent-row .meta { font-size: 11px; color: var(--ink-soft); margin-top: 6px; }
 .progress { height: 6px; background: var(--prog-track); border-radius: 99px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); transition: width 0.3s ease; }
-.row-grid { display: grid; grid-template-columns: auto 1fr 90px; column-gap: 12px; align-items: center; }
+/* Hover + click live on the header only, so the expanded file list below isn't
+   swept into the highlight. The negative margin lets the rounded highlight bleed
+   into the list gutter while keeping content aligned with the rest of the page. */
+.row-grid { display: grid; grid-template-columns: auto 1fr 90px; column-gap: 12px; align-items: center;
+  padding: 10px 12px; margin: 0 -12px; border-radius: 10px; cursor: pointer;
+  transition: background 0.12s ease; }
+.row-grid:hover { background: var(--hover); }
 .row-grid .right { text-align: right; }
 .row-grid .right .pct { font-weight: 500; }
 .row-grid .right .state { font-size: 11px; display: flex; align-items: center; justify-content: flex-end; }
-.expanded-files { margin-top: 12px; padding: 10px 14px; background: var(--surface);
+.expanded-files { margin-top: 4px; padding: 10px 14px; background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--radius); }
 .file-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; color: var(--ink-soft); }
+/* Hover affordance only for the live expanded-row file list, not the Add dialog
+   (whose file rows live in a fixed-width scroll container). */
+.expanded-files .file-row { padding: 4px 6px; margin: 0 -6px; border-radius: 6px; }
+.expanded-files .file-row:hover { background: var(--hover); }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(31,30,29,0.4); display: flex;
   align-items: center; justify-content: center; z-index: 50; }
 .modal { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
