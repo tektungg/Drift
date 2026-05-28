@@ -27,15 +27,15 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
 .shell { display: grid; grid-template-columns: 180px 1fr; height: 100%; }
 .sidebar { background: var(--surface); border-right: 1px solid var(--line); padding: 18px 12px;
   display: flex; flex-direction: column; gap: 2px; }
-.side-item { padding: 8px 12px; border-radius: var(--radius-sm); color: var(--ink-soft); cursor: pointer;
-  display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.side-item { padding: 8px 11px; border-radius: var(--radius-sm); color: var(--ink-soft); cursor: pointer;
+  display: flex; align-items: center; gap: 9px; font-size: 13px; }
 .side-item:hover { background: rgba(0,0,0,0.03); }
 .side-item.active { background: var(--accent-soft); color: var(--ink); }
 .side-totals { padding: 12px; font-family: var(--font-serif); }
 .side-totals .label { font-size: 10px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
 .side-bottom { margin-top: auto; border-top: 1px solid var(--line); padding-top: 8px; }
-.side-settings { padding: 8px 12px; border-radius: var(--radius-sm); color: var(--ink-soft); cursor: pointer;
-  font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.side-settings { padding: 8px 11px; border-radius: var(--radius-sm); color: var(--ink-soft); cursor: pointer;
+  font-size: 13px; display: flex; align-items: center; gap: 9px; }
 .side-settings:hover { background: rgba(0,0,0,0.03); color: var(--ink); }
 .main { padding: 20px 24px; overflow-y: auto; }
 .main-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }

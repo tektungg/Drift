@@ -29,17 +29,18 @@ function renderSidebar() {
   }
   let down = 0, up = 0;
   for (const t of torrents) { down += t.down_bps; up += t.up_bps; }
+  const iconKey = { all: "all", downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused" };
   el.innerHTML = FILTERS.map(f => `
     <div class="side-item ${currentFilter === f.key ? 'active' : ''}" data-key="${f.key}">
-      <span>${f.label}</span><span>${counts[f.key]}</span>
+      <span class="ic">${icon(iconKey[f.key])}</span>
+      <span>${f.label}</span><span class="ct" style="margin-left:auto; font-size:11px; opacity:.8">${counts[f.key]}</span>
     </div>`).join("") +
     `<div class="side-bottom">
-      <div class="side-totals">
+      <div class="totals">
         <div class="label">Total</div>
-        <div style="font-size:13px">↓ ${fmtBps(down)}</div>
-        <div style="font-size:11px;color:var(--ink-soft)">↑ ${fmtBps(up)}</div>
+        <div class="spd"><span>↓ ${fmtBps(down)}</span><span style="color:var(--ink-soft)">↑ ${fmtBps(up)}</span></div>
       </div>
-      <div class="side-settings" id="side-settings">⚙  Settings</div>
+      <div class="side-settings" id="side-settings"><span class="ic">${icon("gear")}</span>Settings</div>
     </div>`;
   el.querySelectorAll(".side-item").forEach(n => n.onclick = () => {
     currentFilter = n.dataset.key;
