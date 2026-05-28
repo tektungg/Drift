@@ -192,20 +192,17 @@ In `src/styles.css`, add:
 
 ```css
 .list-controls { display: flex; align-items: center; gap: 8px; }
-.list-search {
+/* All three controls share one explicit height so the styled input lines up
+   exactly with the native <select> (which otherwise renders taller). */
+.list-search, .list-sort, .list-sortdir {
+  height: 34px; box-sizing: border-box;
   background: var(--surface); border: 1px solid var(--line); color: var(--ink);
-  border-radius: 8px; padding: 6px 10px; font-size: 13px; width: 180px;
-  font-family: var(--font-sans); transition: border-color .12s ease, width .12s ease;
+  border-radius: 8px; font-size: 13px; font-family: var(--font-sans);
 }
+.list-search { padding: 0 10px; width: 180px; transition: border-color .12s ease, width .12s ease; }
 .list-search:focus { outline: none; border-color: var(--accent); width: 220px; }
-.list-sort {
-  background: var(--surface); border: 1px solid var(--line); color: var(--ink);
-  border-radius: 8px; padding: 6px 8px; font-size: 13px; cursor: pointer; font-family: var(--font-sans);
-}
-.list-sortdir {
-  background: var(--surface); border: 1px solid var(--line); color: var(--ink);
-  border-radius: 8px; padding: 6px 9px; font-size: 13px; cursor: pointer; line-height: 1;
-}
+.list-sort { padding: 0 8px; cursor: pointer; }
+.list-sortdir { padding: 0 11px; cursor: pointer; line-height: 1; }
 .list-sortdir:hover, .list-sort:hover { border-color: var(--accent); }
 ```
 

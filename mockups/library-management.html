@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Drift — Library Management mockup</title>
+<link rel="stylesheet" href="../src/styles.css">
+<style>
+  /* ===== PROPOSED NEW STYLES (previewing the v0.4.0 additions) ===== */
+  .list-controls { display: flex; align-items: center; gap: 8px; }
+  /* All three controls share one height so they line up exactly. */
+  .list-search, .list-sort, .list-sortdir {
+    height: 34px; box-sizing: border-box;
+    background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 8px; font-size: 13px; font-family: var(--font-sans);
+  }
+  .list-search { padding: 0 10px; width: 180px; transition: border-color .12s ease, width .12s ease; }
+  .list-search:focus { outline: none; border-color: var(--accent); width: 220px; }
+  .list-sort { padding: 0 8px; cursor: pointer; }
+  .list-sortdir { padding: 0 11px; cursor: pointer; line-height: 1; }
+  .list-sortdir:hover, .list-sort:hover { border-color: var(--accent); }
+
+  .bulk-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px;
+  }
+  .bulk-bar .count { font-weight: 500; }
+  .bulk-bar .spacer { flex: 1; }
+  .bulk-bar button { font-size: 12px; padding: 5px 11px; }
+
+  .torrent-row.selected .row-grid { background: var(--accent-soft); }
+  .torrent-row.selected .row-grid:hover { background: var(--accent-soft); }
+
+  :root { --st-queued: #B0A99C; }
+  :root[data-theme="dark"] { --st-queued: #B0A99C; }
+
+  /* make the mockup fill a desktop-window-sized frame */
+  html, body { height: 760px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-item" data-key="all">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span>All</span><span class="ct" style="margin-left:auto; font-size:11px; opacity:.8">5</span>
+    </div>
+    <div class="side-item active" data-key="downloading">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg></span>
+      <span>Downloading</span><span class="ct" style="margin-left:auto; font-size:11px; opacity:.8">2</span>
+    </div>
+    <div class="side-item" data-key="seeding">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V7"/><path d="m6 13 6-6 6 6"/><path d="M5 3h14"/></svg></span>
+      <span>Seeding</span><span class="ct" style="margin-left:auto; font-size:11px; opacity:.8">1</span>
+    </div>
+    <div class="side-item" data-key="completed">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+      <span>Completed</span><span class="ct" style="margin-left:auto; font-size:11px; opacity:.8">0</span>
+    </div>
+    <div class="side-item" data-key="paused">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>
+      <span>Paused</span><span class="ct" style="margin-left:auto; font-size:11px; opacity:.8">1</span>
+    </div>
+    <div class="side-item" data-key="queued">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg></span>
+      <span>Queued</span><span class="ct" style="margin-left:auto; font-size:11px; opacity:.8">1</span>
+    </div>
+    <div class="side-bottom">
+      <div class="totals">
+        <div class="label">Total</div>
+        <div class="spd"><span>↓ 8.7 MB/s</span><span style="color:var(--ink-soft)">↑ 230 KB/s</span></div>
+      </div>
+      <div class="side-settings" id="side-settings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></span>Settings</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-head">
+      <h1 id="main-title">All downloads</h1>
+      <div class="list-controls">
+        <input type="text" class="list-search" placeholder="Search…" value="">
+        <select class="list-sort">
+          <option value="added">Date added</option>
+          <option>Name</option><option>Progress</option><option>Speed</option><option>Size</option>
+        </select>
+        <button class="list-sortdir">↓</button>
+      </div>
+      <button class="btn-primary" id="btn-add">+ Add torrent</button>
+    </div>
+
+    <div class="bulk-bar">
+      <span class="count">2 selected</span>
+      <div class="spacer"></div>
+      <button class="btn-ghost">Resume</button>
+      <button class="btn-ghost">Pause</button>
+      <button class="btn-ghost">Remove</button>
+      <button class="btn-ghost">Clear</button>
+    </div>
+
+    <div id="torrent-list">
+
+      <!-- seeding, complete -->
+      <div class="torrent-row" data-ih="t1">
+        <div class="row-grid">
+          <div class="ficon other"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg></div>
+          <div>
+            <div class="name">test_folder</div>
+            <div class="progress"><div style="width:100%; background:var(--st-seeding)"></div></div>
+            <div class="meta">18.4 MB · ↑ 0 B/s · 0 peers</div>
+          </div>
+          <div class="right">
+            <div class="pct">100%</div>
+            <div class="state st-seeding"><span class="state-dot"></span>Seeding</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- downloading, SELECTED -->
+      <div class="torrent-row selected" data-ih="t2">
+        <div class="row-grid">
+          <div class="ficon program"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg></div>
+          <div>
+            <div class="name">Assassin's Creed Shadows [FitGirl Repack]</div>
+            <div class="progress"><div style="width:15%; background:var(--st-downloading)"></div></div>
+            <div class="meta">11.8 GB / 77.4 GB · 8.65 MB/s · 6 peers · ETA 2h 14m</div>
+          </div>
+          <div class="right">
+            <div class="pct">15%</div>
+            <div class="state st-downloading"><span class="state-dot"></span>Downloading</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- downloading, SELECTED -->
+      <div class="torrent-row selected" data-ih="t3">
+        <div class="row-grid">
+          <div class="ficon program"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg></div>
+          <div>
+            <div class="name">ubuntu-24.04.1-desktop-amd64.iso</div>
+            <div class="progress"><div style="width:62%; background:var(--st-downloading)"></div></div>
+            <div class="meta">3.1 GB / 5.0 GB · 1.2 MB/s · 18 peers · ETA 26m</div>
+          </div>
+          <div class="right">
+            <div class="pct">62%</div>
+            <div class="state st-downloading"><span class="state-dot"></span>Downloading</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUEUED -->
+      <div class="torrent-row" data-ih="t4">
+        <div class="row-grid">
+          <div class="ficon program"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg></div>
+          <div>
+            <div class="name">Fedora-Workstation-Live-41-x86_64.iso</div>
+            <div class="progress"><div style="width:0%; background:var(--st-queued)"></div></div>
+            <div class="meta">0 B / 2.2 GB · waiting for a free slot</div>
+          </div>
+          <div class="right">
+            <div class="pct">0%</div>
+            <div class="state st-queued"><span class="state-dot"></span>Queued</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- paused -->
+      <div class="torrent-row" data-ih="t5">
+        <div class="row-grid">
+          <div class="ficon video"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none"/></svg></div>
+          <div>
+            <div class="name">Big Buck Bunny (2008) 1080p.mkv</div>
+            <div class="progress"><div style="width:40%; background:var(--st-paused)"></div></div>
+            <div class="meta">160 MB / 400 MB · paused</div>
+          </div>
+          <div class="right">
+            <div class="pct">40%</div>
+            <div class="state st-paused"><span class="state-dot"></span>Paused</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>
