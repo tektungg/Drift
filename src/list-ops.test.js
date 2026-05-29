@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesSearch, filterTorrents, compareBy, sortTorrents } from "./list-ops.js";
+import { matchesSearch, filterTorrents, compareBy, sortTorrents, sortDirectionLabel } from "./list-ops.js";
 
 const A = { infohash: "a", name: "Ubuntu 24.04", state_label: "downloading", downloaded: 50, total: 100, down_bps: 10, total_size: 100, added_at: 3 };
 const B = { infohash: "b", name: "Debian 12",    state_label: "seeding",     downloaded: 100, total: 100, down_bps: 0,  total_size: 200, added_at: 1 };
@@ -46,4 +46,22 @@ test("sortTorrents does not mutate input", () => {
   const arr = [A, B, C];
   sortTorrents(arr, "name", "asc");
   assert.deepEqual(arr.map(t => t.infohash), ["a", "b", "c"]);
+});
+
+test("sortDirectionLabel gives meaningful per-key wording", () => {
+  assert.equal(sortDirectionLabel("added", "desc"), "↓ newest");
+  assert.equal(sortDirectionLabel("added", "asc"),  "↑ oldest");
+  assert.equal(sortDirectionLabel("name", "desc"),  "↓ Z–A");
+  assert.equal(sortDirectionLabel("name", "asc"),   "↑ A–Z");
+  assert.equal(sortDirectionLabel("progress", "desc"), "↓ high");
+  assert.equal(sortDirectionLabel("progress", "asc"),  "↑ low");
+  assert.equal(sortDirectionLabel("speed", "desc"), "↓ fast");
+  assert.equal(sortDirectionLabel("speed", "asc"),  "↑ slow");
+  assert.equal(sortDirectionLabel("size", "desc"),  "↓ large");
+  assert.equal(sortDirectionLabel("size", "asc"),   "↑ small");
+});
+
+test("sortDirectionLabel falls back to a bare arrow for unknown keys", () => {
+  assert.equal(sortDirectionLabel("whatever", "desc"), "↓");
+  assert.equal(sortDirectionLabel("whatever", "asc"),  "↑");
 });

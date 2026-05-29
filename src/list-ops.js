@@ -38,3 +38,19 @@ export function compareBy(key, dir) {
 export function sortTorrents(torrents, key, dir) {
   return [...torrents].sort(compareBy(key, dir));
 }
+
+// Human-friendly direction wording per sort key, shown on the active row of the
+// sort menu. Arrow + a word so the direction is meaningful at a glance.
+const DIR_WORDS = {
+  added:    { desc: "newest", asc: "oldest" },
+  name:     { desc: "Z–A",    asc: "A–Z" },
+  progress: { desc: "high",   asc: "low" },
+  speed:    { desc: "fast",   asc: "slow" },
+  size:     { desc: "large",  asc: "small" },
+};
+
+export function sortDirectionLabel(key, dir) {
+  const arrow = dir === "asc" ? "↑" : "↓";
+  const word = DIR_WORDS[key]?.[dir];
+  return word ? `${arrow} ${word}` : arrow;
+}
