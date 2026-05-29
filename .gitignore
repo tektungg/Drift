@@ -1,6 +1,11 @@
 # Brainstorming session artifacts (browser companion)
 .superpowers/
 
+# Throwaway UI mockups + their dev server (design exploration only; the
+# decisions they informed live in docs/superpowers/specs). Kept locally, not
+# tracked.
+mockups/
+
 # Rust / Tauri
 /target/
 /src-tauri/target/
