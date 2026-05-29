@@ -238,10 +238,13 @@ input[type=text], textarea, select {
 .search-wrap .ic-search { position: absolute; left: 10px; width: 15px; height: 15px;
   color: var(--ink-soft); pointer-events: none; display: inline-flex; }
 .search-wrap .ic-search svg { width: 15px; height: 15px; }
-.list-search { height: 34px; box-sizing: border-box; background: var(--surface);
+/* Scoped under .search-wrap so these win over the global `input[type=text]`
+   rule (specificity 0-1-1) — otherwise its padding/width/radius override ours
+   and the leading icon collides with the placeholder text. */
+.search-wrap .list-search { height: 34px; box-sizing: border-box; background: var(--surface);
   border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-family: var(--font-sans);
   padding: 0 10px 0 32px; width: 220px; border-radius: 9px; transition: border-color .12s ease; }
-.list-search:focus { outline: none; border-color: var(--accent); }
+.search-wrap .list-search:focus { outline: none; border-color: var(--accent); }
 
 /* Custom sort pill (replaces the native select + direction button). */
 .sort-trigger { height: 34px; box-sizing: border-box; display: inline-flex; align-items: center;
