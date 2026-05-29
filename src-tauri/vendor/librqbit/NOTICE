@@ -1,0 +1,34 @@
+librqbit
+Copyright (c) Igor Katson <igor.katson@gmail.com>
+https://github.com/ikatson/rqbit
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. A copy of the License is in the
+LICENSE file in this directory.
+
+---
+
+MODIFICATIONS BY THE DRIFT PROJECT
+
+This is a vendored copy of librqbit 8.1.1 (from crates.io) with local
+modifications, included in Drift under the terms of the Apache License 2.0
+(Section 4, which permits modified distribution provided modified files carry
+prominent notices stating that they were changed).
+
+Changed files and the nature of the change:
+
+- src/storage/filesystem/fs.rs
+- src/storage/filesystem/opened_file.rs
+    The default FilesystemStorage was modified so it no longer holds a
+    persistent read+write file handle for the lifetime of a torrent. It now
+    keeps a read-only handle for reads (used while seeding) and opens a
+    short-lived read+write handle only while writing. On Windows this lets
+    completed files be opened/executed by other applications while the torrent
+    continues seeding (a persistent write handle otherwise blocks execution).
+    A Windows-only regression test was added to fs.rs documenting the behavior.
+
+No other files were functionally modified. The crate's webui/, examples/, and
+generated lockfile were removed from this vendored copy as they are unused by
+Drift (Drift builds librqbit with default features only).
+
+The unmodified upstream project is available at the repository URL above.
