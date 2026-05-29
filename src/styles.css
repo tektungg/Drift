@@ -286,3 +286,44 @@ input[type=text], textarea, select {
 .bulk-bar button svg { width: 14px; height: 14px; }
 .bulk-bar #bulk-clear { margin-left: 4px; }
 .bulk-bar .divider { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
+
+/* Settings drawer tab switcher (Settings / Help / About). */
+.settings-tabs { display: flex; gap: 3px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 9px; padding: 3px; margin-bottom: 18px; }
+.settings-tabs .tab { flex: 1; text-align: center; padding: 7px 0; border-radius: 6px; font-size: 13px;
+  color: var(--ink-soft); cursor: pointer; border: 0; background: transparent; font-family: var(--font-sans); }
+.settings-tabs .tab:hover { color: var(--ink); }
+.settings-tabs .tab.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+
+/* Help view */
+.help-intro { font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; line-height: 1.5; }
+.help-item { border-bottom: 1px solid var(--line); }
+.help-item summary { cursor: pointer; padding: 11px 2px; font-size: 13px; color: var(--ink);
+  list-style: none; display: flex; align-items: center; gap: 8px; }
+.help-item summary::-webkit-details-marker { display: none; }
+.help-item summary .arno { margin-left: auto; color: var(--ink-soft); transition: transform .15s ease;
+  width: 15px; height: 15px; display: inline-flex; }
+.help-item summary .arno svg { width: 15px; height: 15px; }
+.help-item[open] summary .arno { transform: rotate(90deg); }
+.help-item .body { font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; padding: 2px 2px 12px; }
+.help-links { display: flex; gap: 8px; margin-top: 18px; }
+.help-links .lk { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  text-decoration: none; color: var(--ink); border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 9px; font-size: 13px; cursor: pointer; }
+.help-links .lk:hover { border-color: var(--accent); }
+.help-links .lk svg { width: 15px; height: 15px; color: var(--ink-soft); }
+
+/* About view */
+.about { text-align: center; padding: 12px 0 4px; }
+.about .glyph { width: 64px; height: 64px; margin: 8px auto 14px; color: var(--accent); display: inline-flex; }
+.about .glyph svg { width: 64px; height: 64px; }
+.about h3 { font-family: var(--font-serif); font-weight: 500; font-size: 22px; margin: 0 0 2px; }
+.about .ver { font-size: 12px; color: var(--ink-soft); margin-bottom: 12px; }
+.about .tag { font-size: 13px; color: var(--ink); margin: 0 auto 20px; max-width: 280px; line-height: 1.5; }
+.about-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+.about-links .lk { display: flex; align-items: center; justify-content: center; gap: 8px;
+  text-decoration: none; color: var(--ink); border: 1px solid var(--line); background: var(--surface);
+  border-radius: 8px; padding: 9px; font-size: 13px; cursor: pointer; }
+.about-links .lk:hover { border-color: var(--accent); }
+.about-links .lk svg { width: 15px; height: 15px; color: var(--ink-soft); }
+.about .credits { font-size: 11px; color: var(--ink-soft); line-height: 1.6; }
