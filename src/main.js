@@ -1,7 +1,7 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
 import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
 import { icon, extToCategory } from "./icons.js";
-import { filterTorrents, sortTorrents } from "./list-ops.js";
+import { filterTorrents, sortTorrents, sortDirectionLabel } from "./list-ops.js";
 
 // NOTE: production builds should vendor these via npm + a bundler. For
 // development MVP, CDN imports keep the surface minimal. If CSP blocks them,
@@ -282,9 +282,10 @@ function updateBulkBar() {
   bar.innerHTML = `
     <span class="count">${selected.size} selected</span>
     <div class="spacer"></div>
-    <button class="btn-ghost" id="bulk-resume">Resume</button>
-    <button class="btn-ghost" id="bulk-pause">Pause</button>
-    <button class="btn-ghost" id="bulk-remove">Remove</button>
+    <button class="btn-ghost" id="bulk-resume">${icon("downloading")}Resume</button>
+    <button class="btn-ghost" id="bulk-pause">${icon("paused")}Pause</button>
+    <button class="btn-ghost" id="bulk-remove">${icon("trash")}Remove</button>
+    <span class="divider"></span>
     <button class="btn-ghost" id="bulk-clear">Clear</button>`;
   document.getElementById("bulk-resume").onclick = () => bulkAction("resume");
   document.getElementById("bulk-pause").onclick  = () => bulkAction("pause");
@@ -319,23 +320,93 @@ async function bulkRemove() {
   renderAll(); updateBulkBar();
 }
 
+// Sort keys shown in the menu, in display order.
+const SORT_KEYS = [
+  { key: "added",    label: "Date added" },
+  { key: "name",     label: "Name" },
+  { key: "progress", label: "Progress" },
+  { key: "speed",    label: "Speed" },
+  { key: "size",     label: "Size" },
+];
+function sortKeyLabel(key) {
+  return (SORT_KEYS.find(k => k.key === key) || SORT_KEYS[0]).label;
+}
+
+function renderSortTrigger() {
+  const t = document.getElementById("sort-trigger");
+  if (!t) return;
+  t.innerHTML = `${icon("sort")}<span class="sort-label-soft">Sort:</span> ${escape(sortKeyLabel(sortKey))}<span class="chev">${icon("chevron")}</span>`;
+}
+
+function closeSortMenu() {
+  document.querySelectorAll(".sort-menu").forEach(n => n.remove());
+}
+
+function openSortMenu() {
+  closeSortMenu();
+  const trigger = document.getElementById("sort-trigger");
+  if (!trigger) return;
+  const menu = document.createElement("div");
+  menu.className = "sort-menu";
+  menu.innerHTML = `<div class="grouplabel">Sort by</div>` + SORT_KEYS.map(k => {
+    const active = k.key === sortKey;
+    const lead = active ? `<span class="check">${icon("completed")}</span>` : `<span class="blank"></span>`;
+    const dir = active ? `<span class="dirglyph">${sortDirectionLabel(k.key, sortDir)}</span>` : "";
+    return `<div class="mi ${active ? "active" : ""}" data-key="${k.key}">${lead}${escape(k.label)}${dir}</div>`;
+  }).join("");
+  document.body.appendChild(menu);
+
+  // Position under the trigger, kept within the viewport.
+  const r = trigger.getBoundingClientRect();
+  menu.style.top = `${r.bottom + 6}px`;
+  const left = Math.min(r.left, window.innerWidth - menu.offsetWidth - 8);
+  menu.style.left = `${Math.max(8, left)}px`;
+
+  menu.querySelectorAll(".mi").forEach(row => row.onclick = (e) => {
+    e.stopPropagation();
+    const key = row.dataset.key;
+    if (key === sortKey) {
+      sortDir = sortDir === "asc" ? "desc" : "asc"; // re-selecting active key flips direction
+    } else {
+      sortKey = key;
+    }
+    localStorage.setItem("drift-sort-key", sortKey);
+    localStorage.setItem("drift-sort-dir", sortDir);
+    renderSortTrigger();
+    renderList();
+    closeSortMenu();
+  });
+
+  // Dismiss on outside click. Defer attaching so the opening click (still
+  // bubbling) doesn't immediately close the menu.
+  setTimeout(() => {
+    document.addEventListener("click", closeSortMenu, { once: true });
+  }, 0);
+}
+
 function wireListControls() {
   const search = document.getElementById("list-search");
-  const sortSel = document.getElementById("list-sort");
-  const dirBtn = document.getElementById("list-sortdir");
-  if (!search || !sortSel || !dirBtn) return;
-  sortSel.value = sortKey;
-  dirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
+  const wrap = document.getElementById("search-wrap");
+  const trigger = document.getElementById("sort-trigger");
+  if (!search || !wrap || !trigger) return;
+
+  // Leading magnifier icon inside the search field.
+  if (!wrap.querySelector(".ic-search")) {
+    const ic = document.createElement("span");
+    ic.className = "ic-search";
+    ic.innerHTML = icon("search");
+    wrap.insertBefore(ic, search);
+  }
+
   search.addEventListener("input", () => { searchQuery = search.value; renderList(); });
-  sortSel.addEventListener("change", () => {
-    sortKey = sortSel.value; localStorage.setItem("drift-sort-key", sortKey); renderList();
+
+  renderSortTrigger();
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (document.querySelector(".sort-menu")) { closeSortMenu(); return; }
+    openSortMenu();
   });
-  dirBtn.addEventListener("click", () => {
-    sortDir = sortDir === "asc" ? "desc" : "asc";
-    localStorage.setItem("drift-sort-dir", sortDir);
-    dirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
-    renderList();
-  });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSortMenu(); });
 }
 
 function fmtBytes(n) {
