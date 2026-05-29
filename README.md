@@ -49,8 +49,16 @@ I just wanted a torrent client that was fast, looked nice, and did the boring or
 
 - [**Tauri 2**](https://tauri.app/) — tiny native window, real web-tech UI
 - [**Rust**](https://www.rust-lang.org/) — the backend and app shell
-- [**librqbit**](https://github.com/ikatson/rqbit) — a fast async BitTorrent engine
+- [**librqbit**](https://github.com/ikatson/rqbit) — a fast async BitTorrent engine (Apache-2.0)
 - Vanilla HTML/CSS/JS frontend — no framework, no build step
+
+> **Note on librqbit:** Drift vendors a lightly-patched copy of librqbit 8.1.1 in
+> [`src-tauri/vendor/librqbit`](src-tauri/vendor/librqbit). The only change is to the
+> filesystem storage so completed files stay openable/executable while the torrent
+> keeps seeding (Windows holds a write lock otherwise). It remains under the Apache
+> License 2.0 — see the [`LICENSE`](src-tauri/vendor/librqbit/LICENSE) and
+> [`NOTICE`](src-tauri/vendor/librqbit/NOTICE) in that directory for attribution and a
+> description of the modification.
 
 ## Build from source
 
