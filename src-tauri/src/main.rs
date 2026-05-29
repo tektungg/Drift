@@ -72,6 +72,8 @@ fn main() {
             commands::take_pending_source,
             commands::force_start,
             commands::move_in_queue,
+            commands::app_version,
+            commands::open_url,
         ])
         .setup(|app| {
             // ── Heavy init (runs only on the PRIMARY instance) ──────────────────

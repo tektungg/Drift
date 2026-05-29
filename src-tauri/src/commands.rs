@@ -540,6 +540,19 @@ pub fn open_folder(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<()
     tauri_plugin_opener::open_path(&rec.save_path, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// The app version (from Cargo). Shown on the About screen.
+#[tauri::command]
+pub fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// Open an external URL in the user's default browser. Called only with the
+/// hard-coded About/Help links from the frontend — never user input.
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn copy_magnet(ctx: tauri::State<'_, AppCtx>, infohash: String) -> Result<(), String> {
     let snap = ctx.state.snapshot();
@@ -618,4 +631,13 @@ pub async fn set_file_selection(ctx: tauri::State<'_, AppCtx>, infohash: String,
         ctx.state.upsert(r).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn app_version_matches_cargo() {
+        assert_eq!(super::app_version(), env!("CARGO_PKG_VERSION"));
+        assert!(!super::app_version().is_empty());
+    }
 }
