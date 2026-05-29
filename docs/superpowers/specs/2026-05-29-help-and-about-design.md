@@ -12,7 +12,7 @@ Help walks the user through the app's features (beyond the existing empty-state
 "how to add" hints); About shows identity, version, and links.
 
 Frontend-mostly, plus two tiny Tauri commands (version + open-url). Targets a
-**0.5.0** minor release (new feature).
+**0.4.1** release.
 
 **In scope:** a `Settings · Help · About` tab switcher in the panel; a Help view
 (collapsible Q&A + GitHub links); an About view (icon, name, version, tagline,
@@ -148,7 +148,7 @@ hard-coded About links and the two hard-coded Help links — no user-supplied UR
   otherwise reuse `link`. (Decision: reuse `link` — no new icon needed.)
 - `src-tauri/src/commands.rs` — `app_version`, `open_url`.
 - `src-tauri/src/main.rs` — register the two commands.
-- `src-tauri/tauri.conf.json` + `src-tauri/Cargo.toml` — version bump to 0.5.0.
+- `src-tauri/tauri.conf.json` + `src-tauri/Cargo.toml` — version bump to 0.4.1.
 
 No `state.json`/`config.json` changes.
 
