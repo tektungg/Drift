@@ -237,8 +237,10 @@ input[type=text], textarea, select {
   background: var(--surface); border: 1px solid var(--line); color: var(--ink);
   border-radius: 8px; font-size: 13px; font-family: var(--font-sans);
 }
-.list-search { padding: 0 10px; width: 180px; transition: border-color .12s ease, width .12s ease; }
-.list-search:focus { outline: none; border-color: var(--accent); width: 220px; }
+/* Fixed width — do NOT animate width on focus, or the header reflows and the
+   box appears to flicker/collide with the sort control next to it. */
+.list-search { padding: 0 10px; width: 200px; transition: border-color .12s ease; }
+.list-search:focus { outline: none; border-color: var(--accent); }
 .list-sort { padding: 0 8px; cursor: pointer; }
 .list-sortdir { padding: 0 11px; cursor: pointer; line-height: 1; }
 .list-sortdir:hover, .list-sort:hover { border-color: var(--accent); }
@@ -248,6 +250,9 @@ input[type=text], textarea, select {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px;
 }
+/* `display:flex` above otherwise overrides the `hidden` attribute, leaving an
+   empty rounded bar visible when nothing is selected. */
+.bulk-bar[hidden] { display: none; }
 .bulk-bar .count { font-weight: 500; }
 .bulk-bar .spacer { flex: 1; }
 .bulk-bar button { font-size: 12px; padding: 5px 11px; }
