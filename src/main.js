@@ -636,27 +636,33 @@ async function toggleSettings() {
 
 async function renderSettingsPanel() {
   const panel = document.getElementById("settings-panel");
+  // Capture the tab we're rendering. Both branches below await a command, and a
+  // fast second tab click could start another render — if the active tab changed
+  // while we were awaiting, drop this stale render so the latest one wins.
+  const tab = settingsTab;
   const tabs = `
     <div class="settings-tabs" id="settings-tabs">
-      <button class="tab ${settingsTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
-      <button class="tab ${settingsTab === "help" ? "active" : ""}" data-tab="help">Help</button>
-      <button class="tab ${settingsTab === "about" ? "active" : ""}" data-tab="about">About</button>
+      <button class="tab ${tab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
+      <button class="tab ${tab === "help" ? "active" : ""}" data-tab="help">Help</button>
+      <button class="tab ${tab === "about" ? "active" : ""}" data-tab="about">About</button>
     </div>`;
 
   let body, footer;
-  if (settingsTab === "settings") {
+  if (tab === "settings") {
     const cfg = await invoke("get_settings");
+    if (settingsTab !== tab) return; // superseded by a newer render
     body = renderSettingsBody(cfg);
     footer = `<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px">
         <button class="btn-ghost" id="s-cancel">Close</button>
         <button class="btn-primary" id="s-save">Save</button>
       </div>`;
-  } else if (settingsTab === "help") {
+  } else if (tab === "help") {
     body = renderHelpBody();
     footer = `<div style="display:flex; justify-content:flex-end; margin-top:18px">
         <button class="btn-ghost" id="s-cancel">Close</button></div>`;
   } else {
     body = await renderAboutBody();
+    if (settingsTab !== tab) return; // superseded by a newer render
     footer = `<div style="display:flex; justify-content:flex-end; margin-top:18px">
         <button class="btn-ghost" id="s-cancel">Close</button></div>`;
   }
@@ -670,8 +676,8 @@ async function renderSettingsPanel() {
   const cancel = document.getElementById("s-cancel");
   if (cancel) cancel.onclick = () => panel.classList.remove("open");
 
-  if (settingsTab === "settings") wireSettingsBody(panel);
-  else if (settingsTab === "help") wireHelpBody(panel);
+  if (tab === "settings") wireSettingsBody(panel);
+  else if (tab === "help") wireHelpBody(panel);
   else wireAboutBody(panel);
 }
 

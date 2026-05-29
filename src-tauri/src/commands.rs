@@ -547,9 +547,15 @@ pub fn app_version() -> String {
 }
 
 /// Open an external URL in the user's default browser. Called only with the
-/// hard-coded About/Help links from the frontend — never user input.
+/// hard-coded About/Help links from the frontend. Enforce an https-only
+/// allow-list in Rust so the invariant is real rather than advisory — a
+/// modified/compromised frontend can't use this to launch arbitrary
+/// `file://`/`smb://` URIs via the OS opener.
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err("refused: only https URLs may be opened".into());
+    }
     tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
