@@ -766,10 +766,74 @@ function wireSettingsBody(panel) {
   };
 }
 
-function renderHelpBody() { return `<div class="help-intro">Help — coming in the next step.</div>`; }
-function wireHelpBody() {}
-async function renderAboutBody() { return `<div class="about"><h3>Drift</h3></div>`; }
-function wireAboutBody() {}
+const HELP_ITEMS = [
+  ["Adding torrents",
+   "Paste a magnet link, drag a <b>.torrent</b> file onto the window, click <b>+ Add torrent</b> to browse, or just copy a magnet — Drift watches your clipboard and offers to add it."],
+  ["Where downloads go",
+   "Files are auto-sorted into category folders (Video, Audio, Documents, …). Folder-style torrents go to <b>Other/&lt;name&gt;</b>. Change the destination per-torrent in the Add dialog, or set the default folder in Settings."],
+  ["Picking which files",
+   "Uncheck files you don't want in the Add dialog, or expand a row to change the selection even mid-download."],
+  ["The download queue",
+   "Set <b>Max active downloads</b> in Settings; extras wait as <b>Queued</b> and start automatically as slots free up. Right-click a torrent to <b>Force start</b> (bypass the cap) or reorder its priority."],
+  ["Selecting several at once",
+   "Ctrl-click to pick multiple torrents, Shift-click for a range, then use the action bar to pause, resume or remove them together."],
+  ["Magnet links from your browser",
+   "Turn on <b>Open magnet links with Drift</b> in Settings, then clicking a magnet anywhere opens Drift with the Add dialog ready."],
+  ["Seeding & opening files",
+   "Completed files stay shared with other peers — and you can open or run them <b>while Drift keeps seeding</b>."],
+  ["Closing to the tray",
+   "Closing the window keeps Drift seeding in the system tray. Click the tray icon to bring it back."],
+];
+
+const GH_REPO = "https://github.com/tektungg/Drift";
+const GH_RELEASES = "https://github.com/tektungg/Drift/releases";
+const GH_LICENSE = "https://github.com/tektungg/Drift/blob/main/LICENSE";
+const GH_ISSUES = "https://github.com/tektungg/Drift/issues";
+
+function renderHelpBody() {
+  const items = HELP_ITEMS.map(([q, a], i) => `
+    <details class="help-item" ${i === 0 ? "open" : ""}>
+      <summary>${escape(q)}<span class="arno">${icon("chevron")}</span></summary>
+      <div class="body">${a}</div>
+    </details>`).join("");
+  return `
+    <p class="help-intro">Quick answers to get the most out of Drift.</p>
+    ${items}
+    <div class="help-links">
+      <a class="lk" data-url="${GH_REPO}">${icon("link")} Full guide on GitHub</a>
+      <a class="lk" data-url="${GH_ISSUES}">Report an issue</a>
+    </div>`;
+}
+
+function wireHelpBody(panel) {
+  panel.querySelectorAll(".help-links .lk").forEach(a => a.onclick = () => {
+    invoke("open_url", { url: a.dataset.url }).catch(e => showToast("error", friendlyError(e)));
+  });
+}
+
+async function renderAboutBody() {
+  let version = "";
+  try { version = await invoke("app_version"); } catch (e) { version = ""; }
+  return `
+    <div class="about">
+      <div class="glyph">${icon("wave")}</div>
+      <h3>Drift</h3>
+      <div class="ver">${version ? "Version " + escape(version) : ""}</div>
+      <p class="tag">A clean, fast, native Windows torrent client with a warm, Claude-inspired interface.</p>
+      <div class="about-links">
+        <a class="lk" data-url="${GH_REPO}">${icon("link")} GitHub repository</a>
+        <a class="lk" data-url="${GH_RELEASES}">${icon("link")} Releases · check for updates</a>
+        <a class="lk" data-url="${GH_LICENSE}">${icon("link")} License (MIT)</a>
+      </div>
+      <div class="credits">Built with Tauri 2 · Rust · librqbit<br>Not affiliated with Anthropic — just a fan of the aesthetic.</div>
+    </div>`;
+}
+
+function wireAboutBody(panel) {
+  panel.querySelectorAll(".about-links .lk").forEach(a => a.onclick = () => {
+    invoke("open_url", { url: a.dataset.url }).catch(e => showToast("error", friendlyError(e)));
+  });
+}
 
 function openContextMenu(ih, x, y) {
   closeContextMenu();
