@@ -232,18 +232,41 @@ input[type=text], textarea, select {
 .seg-btn.active { background: var(--accent-soft); color: var(--accent); }
 
 .list-controls { display: flex; align-items: center; gap: 8px; }
-.list-search, .list-sort, .list-sortdir {
-  height: 34px; box-sizing: border-box;
-  background: var(--surface); border: 1px solid var(--line); color: var(--ink);
-  border-radius: 8px; font-size: 13px; font-family: var(--font-sans);
-}
-/* Fixed width — do NOT animate width on focus, or the header reflows and the
-   box appears to flicker/collide with the sort control next to it. */
-.list-search { padding: 0 10px; width: 200px; transition: border-color .12s ease; }
+
+/* Search field with a leading magnifier icon. */
+.search-wrap { position: relative; display: inline-flex; align-items: center; }
+.search-wrap .ic-search { position: absolute; left: 10px; width: 15px; height: 15px;
+  color: var(--ink-soft); pointer-events: none; display: inline-flex; }
+.search-wrap .ic-search svg { width: 15px; height: 15px; }
+.list-search { height: 34px; box-sizing: border-box; background: var(--surface);
+  border: 1px solid var(--line); color: var(--ink); font-size: 13px; font-family: var(--font-sans);
+  padding: 0 10px 0 32px; width: 220px; border-radius: 9px; transition: border-color .12s ease; }
 .list-search:focus { outline: none; border-color: var(--accent); }
-.list-sort { padding: 0 8px; cursor: pointer; }
-.list-sortdir { padding: 0 11px; cursor: pointer; line-height: 1; }
-.list-sortdir:hover, .list-sort:hover { border-color: var(--accent); }
+
+/* Custom sort pill (replaces the native select + direction button). */
+.sort-trigger { height: 34px; box-sizing: border-box; display: inline-flex; align-items: center;
+  gap: 7px; background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 9px; font-size: 13px; padding: 0 10px; cursor: pointer;
+  font-family: var(--font-sans); transition: border-color .12s ease; }
+.sort-trigger:hover { border-color: var(--accent); }
+.sort-trigger svg { width: 15px; height: 15px; color: var(--ink-soft); }
+.sort-trigger .chev { width: 13px; height: 13px; margin-left: 2px; }
+.sort-trigger .sort-label-soft { color: var(--ink-soft); }
+
+/* Sort dropdown menu — shares the context-menu visual language. */
+.sort-menu { position: fixed; background: var(--bg); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 5px; min-width: 200px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 200; }
+.sort-menu .grouplabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ink-soft); padding: 4px 10px 4px; }
+.sort-menu .mi { display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--ink); }
+.sort-menu .mi:hover { background: var(--hover); }
+.sort-menu .mi.active { background: var(--accent-soft); color: var(--accent); }
+.sort-menu .mi .check { width: 14px; height: 14px; flex-shrink: 0; display: inline-flex; }
+.sort-menu .mi .check svg { width: 14px; height: 14px; }
+.sort-menu .mi .blank { width: 14px; height: 14px; flex-shrink: 0; }
+.sort-menu .mi .dirglyph { margin-left: auto; font-size: 11px; color: var(--accent); white-space: nowrap; }
 
 .bulk-bar {
   display: flex; align-items: center; gap: 10px;
@@ -255,4 +278,8 @@ input[type=text], textarea, select {
 .bulk-bar[hidden] { display: none; }
 .bulk-bar .count { font-weight: 500; }
 .bulk-bar .spacer { flex: 1; }
-.bulk-bar button { font-size: 12px; padding: 5px 11px; }
+.bulk-bar button { font-size: 12px; padding: 5px 11px; display: inline-flex;
+  align-items: center; gap: 6px; }
+.bulk-bar button svg { width: 14px; height: 14px; }
+.bulk-bar #bulk-clear { margin-left: 4px; }
+.bulk-bar .divider { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
