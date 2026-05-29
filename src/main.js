@@ -22,6 +22,7 @@ let currentFilter = "all";
 let searchQuery = "";
 let sortKey = localStorage.getItem("drift-sort-key") || "added";
 let sortDir = localStorage.getItem("drift-sort-dir") || "desc";
+let settingsTab = "settings"; // "settings" | "help" | "about"
 let torrents = [];  // [{infohash, name, downloaded, total, down_bps, up_bps, peers, state_label}]
 let expanded = new Set();
 let selected = new Set();      // infohashes currently selected
@@ -628,10 +629,54 @@ async function openAddDialog(initialSource = "") {
 async function toggleSettings() {
   const panel = document.getElementById("settings-panel");
   if (panel.classList.contains("open")) { panel.classList.remove("open"); return; }
-  const cfg = await invoke("get_settings");
-  panel.innerHTML = `
-    <h2 style="font-family:var(--font-serif); margin:0 0 16px; font-size:18px; font-weight:500">Settings</h2>
+  settingsTab = "settings";          // always open on the Settings tab
+  await renderSettingsPanel();
+  panel.classList.add("open");
+}
 
+async function renderSettingsPanel() {
+  const panel = document.getElementById("settings-panel");
+  const tabs = `
+    <div class="settings-tabs" id="settings-tabs">
+      <button class="tab ${settingsTab === "settings" ? "active" : ""}" data-tab="settings">Settings</button>
+      <button class="tab ${settingsTab === "help" ? "active" : ""}" data-tab="help">Help</button>
+      <button class="tab ${settingsTab === "about" ? "active" : ""}" data-tab="about">About</button>
+    </div>`;
+
+  let body, footer;
+  if (settingsTab === "settings") {
+    const cfg = await invoke("get_settings");
+    body = renderSettingsBody(cfg);
+    footer = `<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px">
+        <button class="btn-ghost" id="s-cancel">Close</button>
+        <button class="btn-primary" id="s-save">Save</button>
+      </div>`;
+  } else if (settingsTab === "help") {
+    body = renderHelpBody();
+    footer = `<div style="display:flex; justify-content:flex-end; margin-top:18px">
+        <button class="btn-ghost" id="s-cancel">Close</button></div>`;
+  } else {
+    body = await renderAboutBody();
+    footer = `<div style="display:flex; justify-content:flex-end; margin-top:18px">
+        <button class="btn-ghost" id="s-cancel">Close</button></div>`;
+  }
+
+  panel.innerHTML = tabs + body + footer;
+
+  panel.querySelectorAll("#settings-tabs .tab").forEach(b => b.onclick = () => {
+    settingsTab = b.dataset.tab;
+    renderSettingsPanel();
+  });
+  const cancel = document.getElementById("s-cancel");
+  if (cancel) cancel.onclick = () => panel.classList.remove("open");
+
+  if (settingsTab === "settings") wireSettingsBody(panel);
+  else if (settingsTab === "help") wireHelpBody(panel);
+  else wireAboutBody(panel);
+}
+
+function renderSettingsBody(cfg) {
+  return `
     <div class="settings-group">
       <div class="group-label">Downloads</div>
       <div class="settings-row"><span>Default download folder</span></div>
@@ -678,22 +723,16 @@ async function toggleSettings() {
           <label style="font-size:12px; color:var(--ink-soft)">${k}</label>
           <input type="text" id="s-cat-${k}" value="${escape(cfg.category_map[k].join(' '))}">
         </div>`).join("")}
-    </details>
+    </details>`;
+}
 
-    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px">
-      <button class="btn-ghost" id="s-cancel">Close</button>
-      <button class="btn-primary" id="s-save">Save</button>
-    </div>`;
-  panel.classList.add("open");
-
-  // Toggle switches: clicking flips the data-on flag and the .off class.
+function wireSettingsBody(panel) {
   panel.querySelectorAll(".switch").forEach(sw => sw.onclick = () => {
     const on = sw.dataset.on !== "true";
     sw.dataset.on = String(on);
     sw.classList.toggle("off", !on);
   });
 
-  // Theme segmented control: mark active + apply live for instant preview.
   const themeBtns = panel.querySelectorAll("#s-theme .seg-btn");
   themeBtns.forEach(b => b.onclick = () => {
     themeBtns.forEach(x => x.classList.remove("active"));
@@ -701,7 +740,6 @@ async function toggleSettings() {
     applyTheme(b.dataset.val);
   });
 
-  document.getElementById("s-cancel").onclick = () => panel.classList.remove("open");
   document.getElementById("s-save").onclick = async () => {
     const isOn = id => document.getElementById(id).dataset.on === "true";
     const themeBtn = panel.querySelector("#s-theme .seg-btn.active");
@@ -721,12 +759,17 @@ async function toggleSettings() {
     };
     try {
       await invoke("set_settings", { value });
-      applyTheme(value.theme);  // commit the chosen theme + sync localStorage
-      panel.classList.remove("open");
+      applyTheme(value.theme);
+      document.getElementById("settings-panel").classList.remove("open");
       showToast("info", "Settings saved.");
     } catch (e) { showToast("error", friendlyError(e)); }
   };
 }
+
+function renderHelpBody() { return `<div class="help-intro">Help — coming in the next step.</div>`; }
+function wireHelpBody() {}
+async function renderAboutBody() { return `<div class="about"><h3>Drift</h3></div>`; }
+function wireAboutBody() {}
 
 function openContextMenu(ih, x, y) {
   closeContextMenu();
