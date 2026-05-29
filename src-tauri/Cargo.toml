@@ -38,3 +38,13 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [dev-dependencies]
 tempfile = "3"
+
+# Vendored, lightly-patched librqbit. The only change vs upstream 8.1.1 is that
+# the filesystem storage no longer holds a persistent write handle on content
+# files — it keeps a read-only handle for reads (seeding) and takes a transient
+# write handle only while writing. On Windows this lets completed files be
+# opened/executed by other apps WHILE the torrent keeps seeding (a persistent
+# write handle blocks execution). The storage stays the same FilesystemStorage
+# type, so librqbit's JSON fast-resume persistence still works unchanged.
+[patch.crates-io]
+librqbit = { path = "vendor/librqbit" }
