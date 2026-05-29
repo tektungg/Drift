@@ -1,6 +1,7 @@
 import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
 import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
 import { icon, extToCategory } from "./icons.js";
+import { filterTorrents, sortTorrents, sortDirectionLabel } from "./list-ops.js";
 
 // NOTE: production builds should vendor these via npm + a bundler. For
 // development MVP, CDN imports keep the surface minimal. If CSP blocks them,
@@ -15,10 +16,16 @@ const FILTERS = [
   { key: "seeding", label: "Seeding" },
   { key: "completed", label: "Completed" },
   { key: "paused", label: "Paused" },
+  { key: "queued", label: "Queued" },
 ];
 let currentFilter = "all";
+let searchQuery = "";
+let sortKey = localStorage.getItem("drift-sort-key") || "added";
+let sortDir = localStorage.getItem("drift-sort-dir") || "desc";
 let torrents = [];  // [{infohash, name, downloaded, total, down_bps, up_bps, peers, state_label}]
 let expanded = new Set();
+let selected = new Set();      // infohashes currently selected
+let lastClickedIh = null;      // anchor for shift-range selection
 
 // ── Theme (system / light / dark) ──
 let themeChoice = "system";
@@ -46,7 +53,7 @@ function renderSidebar() {
   }
   let down = 0, up = 0;
   for (const t of torrents) { down += t.down_bps; up += t.up_bps; }
-  const iconKey = { all: "all", downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused" };
+  const iconKey = { all: "all", downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused", queued: "downloading" };
   el.innerHTML = FILTERS.map(f => `
     <div class="side-item ${currentFilter === f.key ? 'active' : ''}" data-key="${f.key}">
       <span class="ic">${icon(iconKey[f.key])}</span>
@@ -84,7 +91,7 @@ function emptyStateHtml() {
       </div>
     </div>`;
   }
-  const labels = { downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused" };
+  const labels = { downloading: "downloading", seeding: "seeding", completed: "completed", paused: "paused", queued: "queued" };
   return `<div class="empty">
     <div class="glyph">${icon("wave")}</div>
     <h3>Nothing ${labels[currentFilter] || "here"} right now</h3>
@@ -94,8 +101,10 @@ function emptyStateHtml() {
 
 function renderList() {
   const list = document.getElementById("torrent-list");
-  const filtered = currentFilter === "all" ? torrents
-    : torrents.filter(t => t.state_label === currentFilter);
+  const filtered = sortTorrents(
+    filterTorrents(torrents, currentFilter, searchQuery),
+    sortKey, sortDir
+  );
   if (filtered.length === 0) {
     list.innerHTML = emptyStateHtml();
     return;
@@ -106,7 +115,24 @@ function renderList() {
     // click on a file checkbox in the expanded area would bubble up and
     // collapse the row. Right-click anywhere on the row opens the menu.
     const grid = n.querySelector(".row-grid");
-    if (grid) grid.onclick = () => toggleExpand(n.dataset.ih);
+    if (grid) grid.onclick = (e) => {
+      const ih = n.dataset.ih;
+      if (e.ctrlKey || e.metaKey) {
+        if (selected.has(ih)) selected.delete(ih); else selected.add(ih);
+        lastClickedIh = ih;
+        renderList(); updateBulkBar();
+      } else if (e.shiftKey && lastClickedIh) {
+        const order = [...document.querySelectorAll(".torrent-row")].map(r => r.dataset.ih);
+        const i = order.indexOf(lastClickedIh), j = order.indexOf(ih);
+        if (i !== -1 && j !== -1) {
+          const [lo, hi] = i < j ? [i, j] : [j, i];
+          for (let k = lo; k <= hi; k++) selected.add(order[k]);
+        }
+        renderList(); updateBulkBar();
+      } else {
+        toggleExpand(ih);
+      }
+    };
     n.oncontextmenu = (e) => { e.preventDefault(); openContextMenu(n.dataset.ih, e.clientX, e.clientY); };
   });
 }
@@ -175,7 +201,7 @@ function rowHtml(t) {
   const stClass = "st-" + (t.state_label || "downloading");
   const stColorVar = `var(--st-${t.state_label || "downloading"}, var(--accent))`;
   const label = (t.state_label || "downloading").replace(/^\w/, c => c.toUpperCase());
-  return `<div class="torrent-row" data-ih="${t.infohash}">
+  return `<div class="torrent-row ${selected.has(t.infohash) ? "selected" : ""}" data-ih="${t.infohash}">
     <div class="row-grid">
       <div class="ficon ${ic.cat}">${icon(ic.key)}</div>
       <div>
@@ -243,7 +269,145 @@ function toggleExpand(ih) {
   renderList();
 }
 
-function renderAll() { renderSidebar(); renderList(); }
+function renderAll() {
+  for (const ih of [...selected]) if (!torrents.some(t => t.infohash === ih)) selected.delete(ih);
+  renderSidebar(); renderList();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById("bulk-bar");
+  if (!bar) return;
+  if (selected.size === 0) { bar.hidden = true; bar.innerHTML = ""; return; }
+  bar.hidden = false;
+  bar.innerHTML = `
+    <span class="count">${selected.size} selected</span>
+    <div class="spacer"></div>
+    <button class="btn-ghost" id="bulk-resume">${icon("downloading")}Resume</button>
+    <button class="btn-ghost" id="bulk-pause">${icon("paused")}Pause</button>
+    <button class="btn-ghost" id="bulk-remove">${icon("trash")}Remove</button>
+    <span class="divider"></span>
+    <button class="btn-ghost" id="bulk-clear">Clear</button>`;
+  document.getElementById("bulk-resume").onclick = () => bulkAction("resume");
+  document.getElementById("bulk-pause").onclick  = () => bulkAction("pause");
+  document.getElementById("bulk-remove").onclick = () => bulkRemove();
+  document.getElementById("bulk-clear").onclick  = () => {
+    selected.clear(); lastClickedIh = null; renderList(); updateBulkBar();
+  };
+}
+
+async function bulkAction(cmd) {
+  const ids = [...selected];
+  for (const ih of ids) {
+    try { await invoke(cmd, { infohash: ih }); } catch (e) { /* no-op if not applicable */ }
+  }
+  torrents = await invoke("snapshot");
+  selected.clear(); lastClickedIh = null;
+  renderAll(); updateBulkBar();
+}
+
+async function bulkRemove() {
+  const ids = [...selected];
+  if (!ids.length) return;
+  if (!window.confirm(`Remove ${ids.length} torrent(s) from Drift?`)) return;
+  const deleteFiles = window.confirm(
+    "Also DELETE the downloaded files from disk?\n\nOK = delete files.\nCancel = keep files on disk."
+  );
+  for (const ih of ids) {
+    try { await invoke("remove", { infohash: ih, deleteFiles }); } catch (e) { /* ignore */ }
+  }
+  torrents = await invoke("snapshot");
+  selected.clear(); lastClickedIh = null;
+  renderAll(); updateBulkBar();
+}
+
+// Sort keys shown in the menu, in display order.
+const SORT_KEYS = [
+  { key: "added",    label: "Date added" },
+  { key: "name",     label: "Name" },
+  { key: "progress", label: "Progress" },
+  { key: "speed",    label: "Speed" },
+  { key: "size",     label: "Size" },
+];
+function sortKeyLabel(key) {
+  return (SORT_KEYS.find(k => k.key === key) || SORT_KEYS[0]).label;
+}
+
+function renderSortTrigger() {
+  const t = document.getElementById("sort-trigger");
+  if (!t) return;
+  t.innerHTML = `${icon("sort")}<span class="sort-label-soft">Sort:</span> ${escape(sortKeyLabel(sortKey))}<span class="chev">${icon("chevron")}</span>`;
+}
+
+function closeSortMenu() {
+  document.querySelectorAll(".sort-menu").forEach(n => n.remove());
+}
+
+function openSortMenu() {
+  closeSortMenu();
+  const trigger = document.getElementById("sort-trigger");
+  if (!trigger) return;
+  const menu = document.createElement("div");
+  menu.className = "sort-menu";
+  menu.innerHTML = `<div class="grouplabel">Sort by</div>` + SORT_KEYS.map(k => {
+    const active = k.key === sortKey;
+    const lead = active ? `<span class="check">${icon("completed")}</span>` : `<span class="blank"></span>`;
+    const dir = active ? `<span class="dirglyph">${sortDirectionLabel(k.key, sortDir)}</span>` : "";
+    return `<div class="mi ${active ? "active" : ""}" data-key="${k.key}">${lead}${escape(k.label)}${dir}</div>`;
+  }).join("");
+  document.body.appendChild(menu);
+
+  // Position under the trigger, kept within the viewport.
+  const r = trigger.getBoundingClientRect();
+  menu.style.top = `${r.bottom + 6}px`;
+  const left = Math.min(r.left, window.innerWidth - menu.offsetWidth - 8);
+  menu.style.left = `${Math.max(8, left)}px`;
+
+  menu.querySelectorAll(".mi").forEach(row => row.onclick = (e) => {
+    e.stopPropagation();
+    const key = row.dataset.key;
+    if (key === sortKey) {
+      sortDir = sortDir === "asc" ? "desc" : "asc"; // re-selecting active key flips direction
+    } else {
+      sortKey = key;
+    }
+    localStorage.setItem("drift-sort-key", sortKey);
+    localStorage.setItem("drift-sort-dir", sortDir);
+    renderSortTrigger();
+    renderList();
+    closeSortMenu();
+  });
+
+  // Dismiss on outside click. Defer attaching so the opening click (still
+  // bubbling) doesn't immediately close the menu.
+  setTimeout(() => {
+    document.addEventListener("click", closeSortMenu, { once: true });
+  }, 0);
+}
+
+function wireListControls() {
+  const search = document.getElementById("list-search");
+  const wrap = document.getElementById("search-wrap");
+  const trigger = document.getElementById("sort-trigger");
+  if (!search || !wrap || !trigger) return;
+
+  // Leading magnifier icon inside the search field.
+  if (!wrap.querySelector(".ic-search")) {
+    const ic = document.createElement("span");
+    ic.className = "ic-search";
+    ic.innerHTML = icon("search");
+    wrap.insertBefore(ic, search);
+  }
+
+  search.addEventListener("input", () => { searchQuery = search.value; renderList(); });
+
+  renderSortTrigger();
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (document.querySelector(".sort-menu")) { closeSortMenu(); return; }
+    openSortMenu();
+  });
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSortMenu(); });
+}
 
 function fmtBytes(n) {
   if (n < 1024) return `${n} B`;
@@ -501,6 +665,12 @@ async function toggleSettings() {
         <button class="switch ${cfg.magnet_handler ? "" : "off"}" id="s-magnet" data-on="${!!cfg.magnet_handler}"></button></div>
     </div>
 
+    <div class="settings-group">
+      <div class="group-label">Queue</div>
+      <div class="settings-row"><span>Max active downloads (0 = unlimited)</span>
+        <input class="num" type="text" id="s-maxactive" value="${cfg.max_active_downloads ?? 3}"></div>
+    </div>
+
     <details class="settings-group">
       <summary style="cursor:pointer; font-size:10px; text-transform:uppercase; letter-spacing:0.07em; color:var(--ink-soft)">Category extensions</summary>
       ${["video","audio","documents","compressed","programs","images"].map(k => `
@@ -543,6 +713,7 @@ async function toggleSettings() {
       close_to_tray: isOn("s-tray"),
       start_with_windows: isOn("s-startup"),
       magnet_handler: isOn("s-magnet"),
+      max_active_downloads: +document.getElementById("s-maxactive").value || 0,
       theme: themeBtn ? themeBtn.dataset.val : "system",
       category_map: Object.fromEntries(
         ["video","audio","documents","compressed","programs","images"].map(k =>
@@ -571,10 +742,17 @@ function openContextMenu(ih, x, y) {
     t.state_label === "paused"
       ? { label: "Resume", fn: () => invoke("resume", { infohash: ih }) }
       : { label: "Pause",  fn: () => invoke("pause",  { infohash: ih }) },
+    ...((t.state_label === "queued" || t.state_label === "paused")
+        ? [{ label: "Force start", fn: () => invoke("force_start", { infohash: ih }) }]
+        : []),
     { label: "Open folder", fn: () => invoke("open_folder", { infohash: ih }) },
     { label: "Copy magnet",
       fn: () => invoke("copy_magnet", { infohash: ih }),
       onSuccess: () => showToast("info", "Magnet copied to clipboard.") },
+    { label: "Move to top",    fn: () => invoke("move_in_queue", { infohash: ih, dir: "top" }) },
+    { label: "Move up",        fn: () => invoke("move_in_queue", { infohash: ih, dir: "up" }) },
+    { label: "Move down",      fn: () => invoke("move_in_queue", { infohash: ih, dir: "down" }) },
+    { label: "Move to bottom", fn: () => invoke("move_in_queue", { infohash: ih, dir: "bottom" }) },
     { label: "Remove", fn: () => invoke("remove", { infohash: ih, deleteFiles: false }) },
     { label: "Remove + delete files", fn: () => invoke("remove", { infohash: ih, deleteFiles: true }) },
   ];
@@ -617,6 +795,12 @@ listen("open-source", (e) => openAddDialog(e.payload));
 // forward by a magnet handoff (single-instance calls set_focus), pull any
 // pending source. take_pending_source() returns null when there's nothing,
 // so a normal focus is a harmless no-op.
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && selected.size) {
+    selected.clear(); lastClickedIh = null; renderList(); updateBulkBar();
+  }
+});
+
 window.addEventListener("focus", async () => {
   try {
     const pending = await invoke("take_pending_source");
@@ -638,6 +822,7 @@ window.addEventListener("focus", async () => {
     torrents = [];
   }
   renderAll();
+  wireListControls();
   await listen("progress", (e) => applyProgress(e.payload));
   // If Drift was cold-launched from a magnet/.torrent (e.g. a magnet clicked
   // in a browser), the source was stashed in Rust — pull it now that our

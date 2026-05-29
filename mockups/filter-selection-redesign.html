@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Drift — filter & selection redesign</title>
+<link rel="stylesheet" href="../src/styles.css">
+<style>
+  body { padding: 0; }
+  :root { --st-queued: #B0A99C; }
+  :root[data-theme="dark"] { --st-queued: #B0A99C; }
+  .wrap { padding: 24px 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .col h2 { font-family: var(--font-serif); font-weight: 500; font-size: 15px; margin: 0 0 4px; }
+  .col .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin-bottom: 14px; }
+  .theme-toggle { position: fixed; top: 12px; right: 14px; z-index: 10; font-size: 12px;
+    background: var(--surface); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 12px; width: 200px; }
+  .section-title { font-size: 16px; font-family: var(--font-serif); margin: 26px 0 12px; }
+
+  /* ---- CURRENT sidebar items ---- */
+  .cur-item { padding: 8px 11px; border-radius: 6px; color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; gap: 9px; font-size: 13px; }
+  .cur-item:hover { background: var(--hover); }
+  .cur-item.active { background: var(--accent-soft); color: var(--ink); }
+  .cur-item .ic { width: 16px; height: 16px; display: inline-flex; opacity: .8; }
+  .cur-item .ic svg { width: 16px; height: 16px; }
+  .cur-item .ct { margin-left: auto; font-size: 11px; opacity: .8; }
+
+  /* ---- REFINED sidebar items: state dot + count badge ---- */
+  .ref-item { padding: 8px 10px; border-radius: 8px; color: var(--ink-soft); cursor: pointer;
+    display: flex; align-items: center; gap: 10px; font-size: 13px; position: relative; transition: background .12s ease; }
+  .ref-item:hover { background: var(--hover); }
+  .ref-item.active { background: var(--accent-soft); color: var(--ink); font-weight: 500; }
+  /* active accent rail on the left */
+  .ref-item.active::before { content:""; position:absolute; left:0; top:7px; bottom:7px; width:3px;
+    border-radius: 2px; background: var(--accent); }
+  .ref-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ref-item .badge { margin-left: auto; font-size: 11px; min-width: 20px; text-align: center;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; color: var(--ink-soft); }
+  .ref-item.active .badge { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ---- CURRENT bulk bar ---- */
+  .cur-bulk { display: flex; align-items: center; gap: 10px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; width: 560px; }
+  .cur-bulk .count { font-weight: 500; } .cur-bulk .spacer { flex: 1; }
+  .cur-bulk .btn-ghost { font-size: 12px; padding: 5px 11px; }
+
+  /* ---- REFINED bulk bar: floating pill, icon buttons ---- */
+  .ref-bulk { display: inline-flex; align-items: center; gap: 6px; background: var(--ink);
+    color: var(--bg); border-radius: 999px; padding: 7px 8px 7px 16px; font-size: 13px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.22); }
+  :root[data-theme="dark"] .ref-bulk { background: #4A4844; color: var(--ink); border: 1px solid var(--line); }
+  .ref-bulk .count { font-weight: 500; margin-right: 6px; }
+  .ref-bulk .pipe { width:1px; height:18px; background: rgba(255,255,255,.2); margin: 0 4px; }
+  :root[data-theme="dark"] .ref-bulk .pipe { background: rgba(255,255,255,.15); }
+  .ref-bulk .act { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px;
+    border-radius: 999px; cursor: pointer; color: inherit; }
+  .ref-bulk .act:hover { background: rgba(255,255,255,.14); }
+  .ref-bulk .act svg { width: 15px; height: 15px; }
+  .ref-bulk .act.danger:hover { background: var(--accent); }
+  .ref-bulk .x { width: 28px; height: 28px; border-radius: 50%; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .ref-bulk .x:hover { background: rgba(255,255,255,.14); }
+  .ref-bulk .x svg { width: 14px; height: 14px; }
+
+  .anno { font-size: 12px; color: var(--ink-soft); margin-top: 12px; max-width: 560px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme==='dark'?'light':'dark'">Toggle theme</button>
+
+<div style="padding: 22px 28px 0"><div class="section-title">1 · Sidebar filters</div></div>
+<div class="wrap" style="padding-top:0">
+  <div class="col">
+    <div class="lbl">Current</div>
+    <div class="panel">
+      <div class="cur-item active"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>All<span class="ct">5</span></div>
+      <div class="cur-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg></span>Downloading<span class="ct">2</span></div>
+      <div class="cur-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V7"/><path d="m6 13 6-6 6 6"/><path d="M5 3h14"/></svg></span>Seeding<span class="ct">1</span></div>
+      <div class="cur-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Completed<span class="ct">0</span></div>
+      <div class="cur-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></span>Paused<span class="ct">1</span></div>
+      <div class="cur-item"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14"/><path d="m6 11 6 6 6-6"/><path d="M5 21h14"/></svg></span>Queued<span class="ct">1</span></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="lbl">Refined — state dots + count badges + active rail</div>
+    <div class="panel">
+      <div class="ref-item active"><span class="dot" style="background:var(--ink-soft)"></span>All<span class="badge">5</span></div>
+      <div class="ref-item"><span class="dot" style="background:var(--st-downloading)"></span>Downloading<span class="badge">2</span></div>
+      <div class="ref-item"><span class="dot" style="background:var(--st-seeding)"></span>Seeding<span class="badge">1</span></div>
+      <div class="ref-item"><span class="dot" style="background:var(--st-completed)"></span>Completed<span class="badge">0</span></div>
+      <div class="ref-item"><span class="dot" style="background:var(--st-paused)"></span>Paused<span class="badge">1</span></div>
+      <div class="ref-item"><span class="dot" style="background:var(--st-queued)"></span>Queued<span class="badge">1</span></div>
+    </div>
+    <div class="anno">Each filter gets a small color dot matching its state color (the same palette used on the rows), counts become subtle pills, and the active item gets an accent rail + filled badge. More scannable and visually tied to the row states.</div>
+  </div>
+</div>
+
+<div style="padding: 8px 28px 0"><div class="section-title">2 · Selection (bulk actions)</div></div>
+<div class="wrap" style="padding-top:0; grid-template-columns: 1fr;">
+  <div class="col">
+    <div class="lbl">Current — inline bar pushes the list down</div>
+    <div class="cur-bulk">
+      <span class="count">2 selected</span><div class="spacer"></div>
+      <button class="btn-ghost">Resume</button><button class="btn-ghost">Pause</button>
+      <button class="btn-ghost">Remove</button><button class="btn-ghost">Clear</button>
+    </div>
+    <div class="lbl" style="margin-top:22px">Refined — floating action pill (overlays, doesn't shift the list)</div>
+    <div class="ref-bulk">
+      <span class="count">2 selected</span>
+      <span class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 11 6 6 6-6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>Resume</span>
+      <span class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>Pause</span>
+      <span class="act danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>Remove</span>
+      <span class="pipe"></span>
+      <span class="x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+    </div>
+    <div class="anno">A floating pill that appears centered near the bottom when you select rows — it overlays the list instead of pushing everything down (which also kills the old "phantom empty bar" risk entirely). Icon + label actions, Remove tinted on hover, and an × to clear. This is the Linear/Gmail pattern.</div>
+  </div>
+</div>
+</body>
+</html>

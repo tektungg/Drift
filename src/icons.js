@@ -29,6 +29,12 @@ export const ICONS = {
   plus: SVG('<path d="M12 5v14"/><path d="M5 12h14"/>'),
   wave: SVG('<path d="M2 8c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/><path d="M2 14c2 0 2 2 4 2s2-2 4-2 2 2 4 2 2-2 4-2 2 2 4 2"/>'),
 
+  // controls
+  search:  SVG('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>'),
+  sort:    SVG('<path d="M3 6h12"/><path d="M3 12h8"/><path d="M3 18h4"/>'),
+  chevron: SVG('<path d="m6 9 6 6 6-6"/>'),
+  trash:   SVG('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>'),
+
   // theme toggle
   system: SVG('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>'),
   light:  SVG('<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'),

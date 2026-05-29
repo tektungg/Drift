@@ -23,8 +23,15 @@
     <main class="main">
       <div class="main-head">
         <h1 id="main-title">All downloads</h1>
+        <div class="list-controls">
+          <span class="search-wrap" id="search-wrap">
+            <input type="text" id="list-search" class="list-search" placeholder="Search downloads…" autocomplete="off" spellcheck="false">
+          </span>
+          <button id="sort-trigger" class="sort-trigger" type="button" title="Sort"></button>
+        </div>
         <button class="btn-primary" id="btn-add">+ Add torrent</button>
       </div>
+      <div id="bulk-bar" class="bulk-bar" hidden></div>
       <div id="torrent-list"></div>
     </main>
   </div>

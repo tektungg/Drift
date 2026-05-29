@@ -21,10 +21,15 @@ pub struct Config {
     /// existing torrent client. Defaulted for backward-compatible configs.
     #[serde(default)]
     pub magnet_handler: bool,
+    /// Max torrents downloading at once; the rest wait in the queue.
+    /// 0 = unlimited. Defaulted for backward-compatible configs.
+    #[serde(default = "default_max_active")]
+    pub max_active_downloads: u32,
     pub category_map: SerCategoryMap,
 }
 
 fn default_theme() -> String { "system".into() }
+fn default_max_active() -> u32 { 3 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerCategoryMap {
@@ -61,6 +66,7 @@ impl Default for Config {
             close_to_tray: true,
             theme: "system".into(),
             magnet_handler: false,
+            max_active_downloads: 3,
             category_map: CategoryMap::default().into(),
         }
     }
@@ -104,6 +110,12 @@ impl SettingsStore {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+    #[test]
+    fn max_active_defaults_to_three() {
+        let c = Config::default();
+        assert_eq!(c.max_active_downloads, 3);
+    }
+
     #[test]
     fn defaults_then_persist() {
         let d = tempdir().unwrap();

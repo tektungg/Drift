@@ -154,6 +154,29 @@ per-`ManagedTorrent` rate limiter (or per-torrent options) in the pinned version
   global cap already covers the common single-user case. Record the finding in
   the plan and move on. This is an explicit, pre-agreed exit.
 
+### Feasibility result (2026-05-28): NOT SUPPORTED → FEATURE DROPPED
+
+Investigated librqbit 8.1.1 source directly:
+- `LimitsConfig { upload_bps, download_bps }` and `Limits { set_upload_bps, set_download_bps }`
+  exist (`src/limits.rs`).
+- Per-torrent limits can be set **only at add time** via
+  `AddTorrentOptions.ratelimits: LimitsConfig` (`src/session.rs`).
+- The live torrent's own limiter — `TorrentStateLive.ratelimits: Limits`
+  (`src/torrent_state/live/mod.rs`) — is a **private field with no public
+  accessor or setter**. The only runtime update path in the HTTP API is
+  `h_update_session_ratelimits` (session/global). There is **no public way to
+  change a per-torrent limit at runtime** on a `ManagedTorrent` handle.
+
+The feature's value is adjusting the limit on an existing/running torrent (a
+runtime *Set speed limit…* dialog). That is not possible without forking
+librqbit or a disruptive remove-and-re-add (which forces a data re-check).
+Per the pre-agreed exit, **Feature 4 (per-torrent speed limits) is dropped.**
+
+The `dl_limit`/`ul_limit` fields already added to `TorrentRecord` (Task 5) are
+left in place as reserved, backward-compatible (`serde(default)`) fields — they
+are unused and harmless, and avoid another state-schema churn if a future
+librqbit version exposes a runtime setter. Task 12 is cancelled.
+
 ---
 
 ## Cross-cutting changes
