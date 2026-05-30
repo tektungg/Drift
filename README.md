@@ -19,8 +19,10 @@
 **Drift** is a lightweight torrent app that gets out of your way. Paste a magnet link, drop a `.torrent` file, and it just downloads — neatly sorted into folders by file type, with a calm interface that doesn't look like it's from 2009. It's a ~10 MB install, sits quietly in your system tray, and watches your clipboard so adding a torrent is as simple as copying its link.
 
 <p align="center">
-  <img src="docs/img/screenshot.png" width="780" alt="Drift main window">
+  <img src="docs/img/screenshot.png" width="49%" alt="Drift — light theme">
+  <img src="docs/img/screenshot-dark.png" width="49%" alt="Drift — dark theme">
 </p>
+<p align="center"><sub>Light &amp; dark themes</sub></p>
 
 ## Features
 
