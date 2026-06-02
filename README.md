@@ -26,7 +26,8 @@
 
 ## Features
 
-- **Drop-dead simple adding** — paste a magnet, drag a `.torrent` onto the window, or let the clipboard watcher catch magnet links automatically and offer to download them.
+- **Drop-dead simple adding** — paste a magnet, drag a `.torrent` onto the window, or let the clipboard watcher catch magnet links automatically and offer to download them. After install, Drift registers itself as the handler for `magnet:` links and `.torrent` files, so clicking a magnet in your browser or double-clicking a `.torrent` in Explorer opens it straight in Drift.
+- **Updates itself** — on launch Drift checks for newer signed releases and offers to download and install them in place.
 - **Auto-organized downloads** — files land in tidy category folders (Video, Audio, Documents, Compressed, Programs, Images). Folder-style torrents go to their own named folder. Override the destination per-torrent whenever you like.
 - **Pick exactly what you want** — choose which files inside a torrent to download, even mid-download.
 - **At-a-glance status** — color-coded states (downloading, seeding, completed, paused, stalled), live speeds, peer counts, and ETA.
@@ -38,10 +39,11 @@
 
 Grab the latest installer from the [**Releases page**](https://github.com/tektungg/Drift/releases/latest):
 
-- **`Drift_x64-setup.exe`** — recommended (NSIS installer, installs to Program Files)
+- **`Drift_x64-setup.exe`** — recommended (NSIS installer; choose a per-user or all-users install)
 - **`Drift_x64_en-US.msi`** — MSI alternative
 
-Windows 10/11, 64-bit.
+Windows 10/11, 64-bit. The installer registers the `magnet:` and `.torrent`
+associations and Drift keeps itself up to date from then on.
 
 ## Why Drift?
 
@@ -67,12 +69,16 @@ I just wanted a torrent client that was fast, looked nice, and did the boring or
 You'll need [Rust](https://rustup.rs/), the [Tauri CLI](https://tauri.app/start/prerequisites/) (`cargo install tauri-cli --version "^2.0" --locked`), and the Visual Studio Build Tools with the "Desktop development with C++" workload.
 
 ```powershell
-# Run in development
+# Run in development (no signing needed)
 cargo tauri dev
 
 # Build installers (output in src-tauri/target/release/bundle/)
 cargo tauri build
 ```
+
+> Building installers signs the updater bundle, so `cargo tauri build` needs an
+> updater signing key in the environment — see [CONTRIBUTING.md](CONTRIBUTING.md#releases--the-auto-updater).
+> Plain `cargo tauri dev` does not.
 
 ---
 

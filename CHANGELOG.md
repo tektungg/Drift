@@ -6,6 +6,25 @@ aims to follow semantic-ish versioning.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-02
+### Added
+- **System magnet/`.torrent` association**: the installer now registers Drift as
+  the handler for `magnet:` links and `.torrent` files, so clicking a magnet in
+  the browser or double-clicking a `.torrent` in Explorer opens it in Drift
+  (via `tauri-plugin-deep-link` + a `fileAssociations` entry).
+- **In-app auto-updater** (`tauri-plugin-updater`): on launch Drift checks the
+  GitHub Releases `latest.json` for a newer **signed** build and offers to
+  download and install it.
+
+  > Note: builds up to and including 0.4.1 shipped without the updater, so
+  > existing users must download 0.5.0 manually once; auto-updates work from
+  > 0.5.0 onward.
+### Changed
+- Installer now lets you choose a **per-user or all-users** install (NSIS
+  `installMode: both`) instead of always elevating, and shows a language
+  selector. Added an installer icon and the EULA (LICENSE) page.
+- Synced `package.json` version with `tauri.conf.json`.
+
 ## [0.4.0] — 2026-05-29
 ### Added
 - **Search** the download list by name, plus a custom **sort** menu

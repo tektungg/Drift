@@ -51,6 +51,15 @@ fn main() {
                 }
             }
         }))
+        // deep-link must be registered AFTER single-instance so a `magnet:` URL
+        // opened while Drift is already running is forwarded to the primary
+        // instance rather than handled by the dying secondary. The `magnet:`
+        // scheme is declared in tauri.conf.json > plugins.deep-link, so the
+        // NSIS/MSI installer writes the registry association; Windows then
+        // launches Drift with the URL as an argv entry, which the single-instance
+        // callback and the cold-start argv loop in `.setup()` already consume.
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -234,6 +243,15 @@ fn main() {
             // Start the clipboard watcher
             drift::clipboard::start(app.handle().clone());
 
+            // Check for updates in the background (skip in `tauri dev`, where the
+            // endpoint can't resolve a real release for the dev version anyway).
+            if !tauri::is_dev() {
+                let update_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    check_for_updates(update_handle).await;
+                });
+            }
+
             // Position the magnet-toast bottom-right of the primary monitor
             if let Some(t) = app.get_webview_window("magnet-toast") {
                 if let Ok(Some(m)) = t.primary_monitor() {
@@ -260,4 +278,66 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Ask the updater endpoint whether a newer signed release exists. If one does,
+/// confirm with the user before downloading and installing it, then restart.
+/// All failures are logged and swallowed — a missing/unreachable `latest.json`
+/// (e.g. no release published yet) must never block app startup.
+async fn check_for_updates(app: tauri::AppHandle) {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            tracing::warn!("updater unavailable: {e}");
+            return;
+        }
+    };
+
+    let update = match updater.check().await {
+        Ok(Some(update)) => update,
+        Ok(None) => {
+            tracing::info!("Drift is up to date");
+            return;
+        }
+        Err(e) => {
+            tracing::warn!("update check failed: {e}");
+            return;
+        }
+    };
+
+    // Prompt before touching the user's install.
+    let prompt = {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+        let notes = update
+            .body
+            .clone()
+            .filter(|b| !b.trim().is_empty())
+            .map(|b| format!("\n\n{b}"))
+            .unwrap_or_default();
+        app.dialog()
+            .message(format!(
+                "Drift {} is available (you have {}).{}\n\nDownload and install it now?",
+                update.version, update.current_version, notes
+            ))
+            .title("Update available")
+            .kind(MessageDialogKind::Info)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Install".into(),
+                "Later".into(),
+            ))
+            .blocking_show()
+    };
+    if !prompt {
+        return;
+    }
+
+    if let Err(e) = update.download_and_install(|_, _| {}, || {}).await {
+        tracing::error!("update download/install failed: {e}");
+        return;
+    }
+
+    tracing::info!("update installed; restarting");
+    app.restart();
 }

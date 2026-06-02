@@ -21,6 +21,8 @@
     "core:window:allow-set-position",
     "core:window:allow-primary-monitor",
     "dialog:default",
-    "opener:default"
+    "opener:default",
+    "deep-link:default",
+    "updater:default"
   ]
 }
