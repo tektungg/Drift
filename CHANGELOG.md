@@ -6,6 +6,18 @@ aims to follow semantic-ish versioning.
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-06-03
+### Added
+- **"Check for updates" button** in About for an on-demand update check, with a
+  live download **progress toast** while an update installs.
+### Changed
+- The auto-updater no longer nags: if you dismiss an available update with
+  "Later", it stays quiet for the rest of the session (the manual button still
+  works).
+- Installer polish: branded NSIS header/sidebar images, and uninstall now offers
+  to remove Drift's settings/torrent list (downloads are never touched). Pinned a
+  minimum WebView2 version.
+
 ## [0.5.0] — 2026-06-02
 ### Added
 - **System magnet/`.torrent` association**: the installer now registers Drift as

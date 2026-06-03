@@ -826,9 +826,10 @@ async function renderAboutBody() {
       <h3>Drift</h3>
       <div class="ver">${version ? "Version " + escape(version) : ""}</div>
       <p class="tag">A clean, fast, native Windows torrent client with a warm, Claude-inspired interface.</p>
+      <button class="btn-ghost" id="btn-check-updates" type="button">Check for updates</button>
       <div class="about-links">
         <a class="lk" data-url="${GH_REPO}">${icon("link")} GitHub repository</a>
-        <a class="lk" data-url="${GH_RELEASES}">${icon("link")} Releases · check for updates</a>
+        <a class="lk" data-url="${GH_RELEASES}">${icon("link")} Releases</a>
         <a class="lk" data-url="${GH_LICENSE}">${icon("link")} License (MIT)</a>
       </div>
       <div class="credits">Built with Tauri 2 · Rust · librqbit<br>Not affiliated with Anthropic — just a fan of the aesthetic.</div>
@@ -839,6 +840,12 @@ function wireAboutBody(panel) {
   panel.querySelectorAll(".about-links .lk").forEach(a => a.onclick = () => {
     invoke("open_url", { url: a.dataset.url }).catch(e => showToast("error", friendlyError(e)));
   });
+  const btn = panel.querySelector("#btn-check-updates");
+  if (btn) btn.onclick = () => {
+    showToast("info", "Checking for updates…");
+    // Fire-and-forget: the backend drives the rest via update-* events.
+    invoke("check_for_updates").catch(e => showToast("error", friendlyError(e)));
+  };
 }
 
 function openContextMenu(ih, x, y) {
@@ -900,6 +907,54 @@ function showToast(kind, message) {
 
 // listen for toast events from Rust
 listen("toast", (e) => showToast(e.payload.kind, e.payload.message));
+
+// ── Auto-updater UX ─────────────────────────────────────────────────────────
+// A single persistent toast tracks an in-flight update download; ordinary
+// transient toasts cover "up to date" / errors. The backend (updater.rs) drives
+// all of this via events whether the check was automatic (on launch) or manual
+// (the About → "Check for updates" button).
+function setUpdateProgress(pct, label) {
+  const stack = document.getElementById("toasts");
+  let el = document.getElementById("update-progress-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "update-progress-toast";
+    el.className = "toast info update-toast";
+    el.innerHTML = `<div class="update-msg"></div>` +
+      `<div class="update-bar"><div class="update-bar-fill"></div></div>`;
+    stack.appendChild(el);
+  }
+  el.querySelector(".update-msg").textContent = label;
+  const fill = el.querySelector(".update-bar-fill");
+  if (pct == null) {
+    fill.classList.add("indeterminate");
+    fill.style.width = "100%";
+  } else {
+    fill.classList.remove("indeterminate");
+    fill.style.width = Math.min(100, Math.max(0, pct)) + "%";
+  }
+}
+function clearUpdateProgress() {
+  const el = document.getElementById("update-progress-toast");
+  if (el) el.remove();
+}
+listen("update-none", () => showToast("info", "You’re on the latest version."));
+listen("update-error", (e) => {
+  clearUpdateProgress();
+  showToast("error", "Update failed: " + (e.payload || "unknown error"));
+});
+listen("update-download-started", (e) =>
+  setUpdateProgress(0, `Downloading Drift ${e.payload || ""}…`.replace(/\s+…$/, "…")));
+listen("update-download-progress", (e) => {
+  const p = e.payload || {};
+  if (p.total) {
+    const pct = Math.floor((p.downloaded / p.total) * 100);
+    setUpdateProgress(pct, `Downloading update… ${pct}%`);
+  } else {
+    setUpdateProgress(null, "Downloading update…");
+  }
+});
+listen("update-ready", () => setUpdateProgress(100, "Update ready — restarting…"));
 
 // Single-instance: second launch forwards magnet/torrent to open the Add dialog.
 listen("open-source", (e) => openAddDialog(e.payload));
