@@ -6,6 +6,14 @@ aims to follow semantic-ish versioning.
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-06-03
+### Fixed
+- The About → **"Check for updates"** button is now a full-width, properly
+  padded button instead of a cramped inline one.
+- Release notes now appear in the updater's "update available" dialog: the
+  release pipeline pulls each version's CHANGELOG section into `latest.json`
+  (previously its `notes` field shipped empty).
+
 ## [0.5.1] — 2026-06-03
 ### Added
 - **"Check for updates" button** in About for an on-demand update check, with a

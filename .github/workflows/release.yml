@@ -24,6 +24,24 @@ jobs:
         with:
           workspaces: src-tauri
 
+      # Pull the notes for this version out of CHANGELOG.md so they land in BOTH
+      # the GitHub release body AND latest.json's `notes` field (which the in-app
+      # updater shows in its "update available" dialog). Without this, latest.json
+      # ships with empty notes.
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v',''
+          $content = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^## \[$([regex]::Escape($ver))\][^\r\n]*\r?\n(.*?)(?=^## \[|\z)"
+          $m = [regex]::Match($content, $pattern)
+          $body = if ($m.Success) { $m.Groups[1].Value.Trim() } else { "Drift $ver" }
+          $delim = "NOTES_EOF_$([guid]::NewGuid().ToString('N'))"
+          "body<<$delim" | Add-Content -Path $env:GITHUB_OUTPUT
+          $body         | Add-Content -Path $env:GITHUB_OUTPUT
+          "$delim"      | Add-Content -Path $env:GITHUB_OUTPUT
+
       # Builds the app (cargo tauri build), then creates/updates the release for
       # this tag and uploads the NSIS .exe + MSI bundles. No JS install step:
       # the frontend is static (frontendDist = ../src) with no lockfile.
@@ -33,7 +51,7 @@ jobs:
       # `latest.json` (the manifest the in-app updater polls). The two secrets
       # below must be set in the repo (Settings > Secrets and variables > Actions):
       #   TAURI_SIGNING_PRIVATE_KEY          — contents of ~/.tauri/drift.key
-      #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — the key's password (empty here)
+      #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD — the key's password
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -44,5 +62,6 @@ jobs:
           projectPath: src-tauri
           tagName: ${{ github.ref_name }}
           releaseName: "Drift ${{ github.ref_name }}"
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false

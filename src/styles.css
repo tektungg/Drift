@@ -333,6 +333,13 @@ input[type=text], textarea, select {
 .about h3 { font-family: var(--font-serif); font-weight: 500; font-size: 22px; margin: 0 0 2px; }
 .about .ver { font-size: 12px; color: var(--ink-soft); margin-bottom: 12px; }
 .about .tag { font-size: 13px; color: var(--ink); margin: 0 auto 20px; max-width: 280px; line-height: 1.5; }
+.about #btn-check-updates {
+  display: block; width: 100%; box-sizing: border-box;
+  padding: 9px; margin: 0 0 14px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--accent); color: #fff;
+  font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.about #btn-check-updates:hover { background: var(--accent-hover); }
 .about-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
 .about-links .lk { display: flex; align-items: center; justify-content: center; gap: 8px;
   text-decoration: none; color: var(--ink); border: 1px solid var(--line); background: var(--surface);
