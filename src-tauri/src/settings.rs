@@ -25,11 +25,21 @@ pub struct Config {
     /// 0 = unlimited. Defaulted for backward-compatible configs.
     #[serde(default = "default_max_active")]
     pub max_active_downloads: u32,
+    /// Stop seeding when uploaded / total_size reaches this. 0 = unlimited.
+    #[serde(default)]
+    pub seed_ratio_limit: f64,
+    /// Stop seeding this many minutes after a torrent finishes. 0 = unlimited.
+    #[serde(default)]
+    pub seed_time_limit_mins: u32,
+    /// Show a Windows notification when a download completes.
+    #[serde(default = "default_true")]
+    pub notify_on_complete: bool,
     pub category_map: SerCategoryMap,
 }
 
 fn default_theme() -> String { "system".into() }
 fn default_max_active() -> u32 { 3 }
+fn default_true() -> bool { true }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerCategoryMap {
@@ -67,6 +77,9 @@ impl Default for Config {
             theme: "system".into(),
             magnet_handler: false,
             max_active_downloads: 3,
+            seed_ratio_limit: 0.0,
+            seed_time_limit_mins: 0,
+            notify_on_complete: true,
             category_map: CategoryMap::default().into(),
         }
     }
@@ -114,6 +127,24 @@ mod tests {
     fn max_active_defaults_to_three() {
         let c = Config::default();
         assert_eq!(c.max_active_downloads, 3);
+    }
+
+    #[test]
+    fn legacy_config_loads_with_new_defaults() {
+        // A config.json written before 0.6.0 — none of the new fields present.
+        let json = r#"{
+            "download_root": "C:/D",
+            "download_kbps": 0,
+            "upload_kbps": 0,
+            "clipboard_watch": true,
+            "start_with_windows": false,
+            "close_to_tray": true,
+            "category_map": {"video":[],"audio":[],"documents":[],"compressed":[],"programs":[],"images":[]}
+        }"#;
+        let c: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(c.seed_ratio_limit, 0.0);
+        assert_eq!(c.seed_time_limit_mins, 0);
+        assert!(c.notify_on_complete);
     }
 
     #[test]
