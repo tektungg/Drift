@@ -11,8 +11,9 @@ aims to follow semantic-ish versioning.
 - A corrupt or half-written `state.json` / `config.json` no longer silently
   wipes your torrent list or settings — the bad file is backed up next to the
   original (`.corrupt-<time>.bak`) and Drift starts from defaults.
-- Drift now writes a rotating log file to `…/Drift/logs/drift.log`, so problems
-  in installed (non-console) builds can actually be diagnosed.
+- Drift now writes a daily-rotating log file under `…/Drift/logs/`
+  (`drift.log.<date>`), so problems in installed (non-console) builds can
+  actually be diagnosed.
 ### Security
 - Removed the unused internal devtools-toggle permission from the production
   capability set.

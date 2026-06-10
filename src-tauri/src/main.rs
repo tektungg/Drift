@@ -47,6 +47,9 @@ fn init_logging(data_dir: &std::path::Path) {
 
 fn main() {
     init_logging(&app_data_dir());
+    // A boot marker: timestamps each launch in the log and guarantees the log
+    // file exists even in a session that emits no warnings.
+    tracing::info!("Drift {} starting", env!("CARGO_PKG_VERSION"));
 
     // IMPORTANT: the single-instance plugin must be registered FIRST and all the
     // heavy initialization (the librqbit engine, which binds DHT/peer sockets)
