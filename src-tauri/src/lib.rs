@@ -9,4 +9,5 @@ pub mod tray;
 pub mod clipboard;
 pub mod queue;
 pub mod seeding;
+pub mod persist;
 pub mod updater;
