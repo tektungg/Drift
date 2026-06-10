@@ -19,6 +19,9 @@ aims to follow semantic-ish versioning.
   Tauri (`withGlobalTauri`), so Drift now boots fully offline, and a strict
   Content-Security-Policy replaces the previous `csp: null`.
 ### Fixed
+- **Seeding reachability**: Drift now asks the router to forward its peer port
+  via UPnP/NAT-PMP, so peers behind your NAT can connect inbound to download
+  from you. Previously seeding only worked for peers Drift reached outbound.
 - `cargo tauri dev` no longer hangs on "Waiting for your frontend dev server":
   the config declared an external dev server on port 1430 that nothing started.
   Removing `build.devUrl` lets the Tauri CLI serve the static frontend with its

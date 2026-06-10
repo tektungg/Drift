@@ -90,8 +90,13 @@ impl Engine {
                 folder: Some(resume_dir.to_owned()),
             }),
             fastresume: true,
-            // Don't bind a TCP listener port by default; pick a random one.
+            // Bind a TCP listener for incoming peer connections, trying each
+            // port in the classic BitTorrent range until one is free.
             listen_port_range: Some(6881..6891),
+            // Ask the router (UPnP/NAT-PMP) to forward that port so peers behind
+            // our NAT can reach us — without this, seeding only works for peers
+            // we connect to outbound. Degrades gracefully if the router refuses.
+            enable_upnp_port_forwarding: true,
             ..Default::default()
         };
 
