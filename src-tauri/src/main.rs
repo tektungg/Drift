@@ -63,6 +63,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             commands::snapshot,
             commands::add_torrent,
@@ -158,7 +159,7 @@ fn main() {
                     let prev_emitted = last_state_label.get(&ih_str).cloned();
                     if prev_emitted.as_deref() != Some(u.state_label.as_str()) {
                         last_state_label.insert(ih_str.clone(), u.state_label.clone());
-                        if let Some(mut rec) = rec_opt {
+                        if let Some(mut rec) = rec_opt.clone() {
                             let new_state = match u.state_label.as_str() {
                                 "downloading" => Some(TorrentState::Downloading),
                                 "seeding"     => Some(TorrentState::Seeding),
@@ -175,6 +176,29 @@ fn main() {
                             };
                             if let Some(s) = new_state {
                                 if rec.state != s {
+                                    // Notify only on a REAL finish: the persisted state was
+                                    // actively downloading and the new one is finished. A
+                                    // restart that re-labels an already-finished torrent
+                                    // doesn't transition Downloading→finished, so it stays quiet.
+                                    let was_active = matches!(
+                                        rec.state,
+                                        TorrentState::Downloading | TorrentState::Stalled
+                                    );
+                                    let now_finished = matches!(
+                                        s,
+                                        TorrentState::Seeding | TorrentState::Completed
+                                    );
+                                    if was_active && now_finished
+                                        && settings_for_emit.get().notify_on_complete
+                                    {
+                                        use tauri_plugin_notification::NotificationExt;
+                                        let _ = handle
+                                            .notification()
+                                            .builder()
+                                            .title("Download complete")
+                                            .body(&rec.display_name)
+                                            .show();
+                                    }
                                     rec.state = s;
                                     let _ = state_for_emit.upsert(rec);
                                 }
@@ -185,6 +209,57 @@ fn main() {
                                     &engine_for_emit, &state_for_emit,
                                     settings_for_emit.get().max_active_downloads,
                                 ).await;
+                            }
+                        }
+                    }
+
+                    // ── Seeding bookkeeping + limits ─────────────────────────
+                    // Runs every tick (not only on label change): completed_at
+                    // must also get stamped for torrents that finished before
+                    // 0.6.0, and ratio/time can cross the limit between label
+                    // changes. Re-find the record — the block above may have
+                    // just persisted changes.
+                    if matches!(u.state_label.as_str(), "seeding" | "completed") {
+                        if let Some(mut rec) = state_for_emit
+                            .snapshot()
+                            .torrents
+                            .into_iter()
+                            .find(|t| t.infohash == ih_str)
+                        {
+                            let now_ms = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_millis() as i64)
+                                .unwrap_or(0);
+                            if rec.completed_at.is_none() {
+                                rec.completed_at = Some(now_ms);
+                                let _ = state_for_emit.upsert(rec.clone());
+                            }
+                            if u.state_label == "seeding" {
+                                let cfg = settings_for_emit.get();
+                                let facts = drift::seeding::SeedFacts {
+                                    uploaded: u.uploaded,
+                                    total: u.total,
+                                    completed_at: rec.completed_at,
+                                    now_ms,
+                                    forced: rec.forced,
+                                };
+                                if drift::seeding::should_stop(
+                                    &facts,
+                                    cfg.seed_ratio_limit,
+                                    cfg.seed_time_limit_mins,
+                                ) {
+                                    if engine_for_emit
+                                        .pause(&drift::magnet::InfoHash(ih_str.clone()))
+                                        .await
+                                        .is_ok()
+                                    {
+                                        rec.state = TorrentState::Completed;
+                                        let _ = state_for_emit.upsert(rec);
+                                        tracing::info!(
+                                            "seeding limit reached; stopped {ih_str}"
+                                        );
+                                    }
+                                }
                             }
                         }
                     }

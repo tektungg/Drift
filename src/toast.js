@@ -1,6 +1,8 @@
-import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
-import { listen, emit } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
-import { getCurrentWindow } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/window.js";
+// Tauri API via withGlobalTauri (tauri.conf.json) — no CDN, works offline,
+// and keeps remote script execution out of the strict CSP.
+const { invoke } = window.__TAURI__.core;
+const { listen, emit } = window.__TAURI__.event;
+const { getCurrentWindow } = window.__TAURI__.window;
 
 const win = getCurrentWindow();
 let pending = null;

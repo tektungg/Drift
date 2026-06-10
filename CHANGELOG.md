@@ -6,6 +6,18 @@ aims to follow semantic-ish versioning.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-10
+### Added
+- **Seeding limits**: optional global *stop at ratio* and *stop after N
+  minutes* caps (Settings → Seeding). Torrents that hit a limit stop seeding
+  and show as Completed; **Force start** seeds them anyway.
+- **Download-complete notifications**: a Windows notification when a download
+  finishes (Settings → Behavior to turn off).
+### Security
+- The UI no longer loads `@tauri-apps/api` from a CDN — the API is injected by
+  Tauri (`withGlobalTauri`), so Drift now boots fully offline, and a strict
+  Content-Security-Policy replaces the previous `csp: null`.
+
 ## [0.5.2] — 2026-06-03
 ### Fixed
 - The About → **"Check for updates"** button is now a full-width, properly

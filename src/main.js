@@ -1,12 +1,10 @@
-import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
-import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
+// Tauri API via withGlobalTauri (tauri.conf.json) — no CDN, works offline,
+// and keeps remote script execution out of the strict CSP.
+const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 import { icon, extToCategory } from "./icons.js";
 import { filterTorrents, sortTorrents, sortDirectionLabel } from "./list-ops.js";
 
-// NOTE: production builds should vendor these via npm + a bundler. For
-// development MVP, CDN imports keep the surface minimal. If CSP blocks them,
-// switch to: import {invoke} from "@tauri-apps/api/core" with a bundler.
-//
 // The window uses native Windows decorations (titlebar with min/max/close),
 // so we no longer wire those buttons from JS.
 
@@ -714,12 +712,22 @@ function renderSettingsBody(cfg) {
         <button class="switch ${cfg.start_with_windows ? "" : "off"}" id="s-startup" data-on="${cfg.start_with_windows}"></button></div>
       <div class="settings-row"><span>Open magnet links with Drift</span>
         <button class="switch ${cfg.magnet_handler ? "" : "off"}" id="s-magnet" data-on="${!!cfg.magnet_handler}"></button></div>
+      <div class="settings-row"><span>Notify when a download completes</span>
+        <button class="switch ${cfg.notify_on_complete ? "" : "off"}" id="s-notify" data-on="${!!cfg.notify_on_complete}"></button></div>
     </div>
 
     <div class="settings-group">
       <div class="group-label">Queue</div>
       <div class="settings-row"><span>Max active downloads (0 = unlimited)</span>
         <input class="num" type="text" id="s-maxactive" value="${cfg.max_active_downloads ?? 3}"></div>
+    </div>
+
+    <div class="settings-group">
+      <div class="group-label">Seeding</div>
+      <div class="settings-row"><span>Stop seeding at ratio (0 = unlimited)</span>
+        <input class="num" type="text" id="s-seedratio" value="${cfg.seed_ratio_limit ?? 0}"></div>
+      <div class="settings-row"><span>Stop seeding after minutes (0 = unlimited)</span>
+        <input class="num" type="text" id="s-seedtime" value="${cfg.seed_time_limit_mins ?? 0}"></div>
     </div>
 
     <details class="settings-group">
@@ -758,6 +766,9 @@ function wireSettingsBody(panel) {
       start_with_windows: isOn("s-startup"),
       magnet_handler: isOn("s-magnet"),
       max_active_downloads: +document.getElementById("s-maxactive").value || 0,
+      seed_ratio_limit: Math.max(0, parseFloat(document.getElementById("s-seedratio").value) || 0),
+      seed_time_limit_mins: Math.max(0, Math.floor(+document.getElementById("s-seedtime").value) || 0),
+      notify_on_complete: isOn("s-notify"),
       theme: themeBtn ? themeBtn.dataset.val : "system",
       category_map: Object.fromEntries(
         ["video","audio","documents","compressed","programs","images"].map(k =>

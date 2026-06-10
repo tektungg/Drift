@@ -92,6 +92,7 @@ pub async fn add_torrent(ctx: tauri::State<'_, AppCtx>, req: AddRequest) -> Resu
         total_size: meta.total_size,
         selected_files: req.selected_files,
         queue_position: pos, forced: false, dl_limit: 0, ul_limit: 0,
+        completed_at: None,
     }).map_err(|e| e.to_string())?;
 
     let max_active = ctx.settings.get().max_active_downloads;

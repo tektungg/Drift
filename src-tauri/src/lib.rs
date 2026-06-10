@@ -8,4 +8,5 @@ pub mod events;
 pub mod tray;
 pub mod clipboard;
 pub mod queue;
+pub mod seeding;
 pub mod updater;
