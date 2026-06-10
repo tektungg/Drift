@@ -39,10 +39,7 @@ impl StateStore {
     pub fn load_or_init(dir: &Path) -> Result<Self> {
         std::fs::create_dir_all(dir).with_context(|| format!("create {dir:?}"))?;
         let path = dir.join("state.json");
-        let inner = if path.exists() {
-            let bytes = std::fs::read(&path)?;
-            serde_json::from_slice(&bytes).unwrap_or_default()
-        } else { PersistedState::default() };
+        let inner = crate::persist::load_json_or_recover::<PersistedState>(&path);
         Ok(Self { path, inner: Mutex::new(inner) })
     }
 
