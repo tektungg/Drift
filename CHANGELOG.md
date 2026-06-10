@@ -11,8 +11,9 @@ aims to follow semantic-ish versioning.
 - **Seeding limits**: optional global *stop at ratio* and *stop after N
   minutes* caps (Settings → Seeding). Torrents that hit a limit stop seeding
   and show as Completed; **Force start** seeds them anyway.
-- **Download-complete notifications**: a Windows notification when a download
-  finishes (Settings → Behavior to turn off).
+- **Download-complete notifications**: a Drift-styled toast (bottom-right, with
+  an *Open folder* button) when a download finishes — same look in dev and
+  installed builds (Settings → Behavior to turn off).
 ### Security
 - The UI no longer loads `@tauri-apps/api` from a CDN — the API is injected by
   Tauri (`withGlobalTauri`), so Drift now boots fully offline, and a strict

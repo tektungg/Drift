@@ -63,7 +63,6 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             commands::snapshot,
             commands::add_torrent,
@@ -191,13 +190,20 @@ fn main() {
                                     if was_active && now_finished
                                         && settings_for_emit.get().notify_on_complete
                                     {
-                                        use tauri_plugin_notification::NotificationExt;
-                                        let _ = handle
-                                            .notification()
-                                            .builder()
-                                            .title("Download complete")
-                                            .body(&rec.display_name)
-                                            .show();
+                                        // Drift-styled toast window (shared with the magnet
+                                        // prompt) instead of a native Windows notification —
+                                        // native toasts are attributed to PowerShell in dev
+                                        // and don't match the app's look. toast.js listens,
+                                        // fills in the name, shows itself and auto-dismisses.
+                                        if let Some(t) = handle.get_webview_window("magnet-toast") {
+                                            let _ = t.emit(
+                                                "download-complete",
+                                                serde_json::json!({
+                                                    "infohash": rec.infohash.clone(),
+                                                    "name": rec.display_name.clone(),
+                                                }),
+                                            );
+                                        }
                                     }
                                     rec.state = s;
                                     let _ = state_for_emit.upsert(rec);
