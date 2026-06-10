@@ -1,12 +1,10 @@
-import { invoke } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/core.js";
-import { listen } from "https://cdn.jsdelivr.net/npm/@tauri-apps/api@2/event.js";
+// Tauri API via withGlobalTauri (tauri.conf.json) — no CDN, works offline,
+// and keeps remote script execution out of the strict CSP.
+const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 import { icon, extToCategory } from "./icons.js";
 import { filterTorrents, sortTorrents, sortDirectionLabel } from "./list-ops.js";
 
-// NOTE: production builds should vendor these via npm + a bundler. For
-// development MVP, CDN imports keep the surface minimal. If CSP blocks them,
-// switch to: import {invoke} from "@tauri-apps/api/core" with a bundler.
-//
 // The window uses native Windows decorations (titlebar with min/max/close),
 // so we no longer wire those buttons from JS.
 
