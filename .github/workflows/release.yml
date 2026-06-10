@@ -65,3 +65,14 @@ jobs:
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
+
+      # tauri-action@v0's `releaseDraft: true` is unreliable — it has published
+      # releases despite the flag. Force the release back to a draft so there is
+      # always a manual review gate: a maintainer reviews the notes and clicks
+      # Publish, which is also the moment the in-app auto-updater begins offering
+      # the new version. Idempotent if the release is already a draft.
+      - name: Force the release to stay a draft (manual publish gate)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release edit "${{ github.ref_name }}" --repo "${{ github.repository }}" --draft=true
