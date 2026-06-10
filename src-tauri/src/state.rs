@@ -20,6 +20,9 @@ pub struct TorrentRecord {
     #[serde(default)] pub forced: bool,
     #[serde(default)] pub dl_limit: u32,
     #[serde(default)] pub ul_limit: u32,
+    /// When the torrent first finished downloading (ms epoch). Drives the
+    /// seed-time limit. None for records written before 0.6.0.
+    #[serde(default)] pub completed_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -91,6 +94,7 @@ mod tests {
             state: TorrentState::Downloading,
             added_at: 0, total_size: 0, selected_files: None,
             queue_position: 0, forced: false, dl_limit: 0, ul_limit: 0,
+            completed_at: None,
         }
     }
 
@@ -142,6 +146,7 @@ mod tests {
         assert_eq!(s.torrents[0].forced, false);
         assert_eq!(s.torrents[0].dl_limit, 0);
         assert_eq!(s.torrents[0].ul_limit, 0);
+        assert_eq!(s.torrents[0].completed_at, None);
     }
 
     #[test]
