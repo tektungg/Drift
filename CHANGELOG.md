@@ -6,6 +6,17 @@ aims to follow semantic-ish versioning.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-06-10
+### Fixed
+- A corrupt or half-written `state.json` / `config.json` no longer silently
+  wipes your torrent list or settings — the bad file is backed up next to the
+  original (`.corrupt-<time>.bak`) and Drift starts from defaults.
+- Drift now writes a rotating log file to `…/Drift/logs/drift.log`, so problems
+  in installed (non-console) builds can actually be diagnosed.
+### Security
+- Removed the unused internal devtools-toggle permission from the production
+  capability set.
+
 ## [0.6.0] — 2026-06-10
 ### Added
 - **Seeding limits**: optional global *stop at ratio* and *stop after N

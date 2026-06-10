@@ -6,16 +6,47 @@ use drift::engine::Engine;
 use drift::events::TorrentDto;
 use drift::settings::SettingsStore;
 use drift::state::StateStore;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tauri::{Emitter, Manager};
+use tracing_appender::non_blocking::WorkerGuard;
 
 fn app_data_dir() -> std::path::PathBuf {
     let base = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
     base.join("Drift")
 }
 
+// Holds the non-blocking writer's guard for the process lifetime; dropping it
+// would silently stop the log writer.
+static LOG_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
+
+/// Log to a daily-rotating file under `<data_dir>/logs` so installed
+/// (non-console) builds leave a diagnosable trail. Debug builds also keep the
+/// stdout output that `cargo tauri dev` shows. Level honors `RUST_LOG`,
+/// defaulting to `info`.
+fn init_logging(data_dir: &std::path::Path) {
+    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+    let logs_dir = data_dir.join("logs");
+    let _ = std::fs::create_dir_all(&logs_dir);
+    let (nb, guard) =
+        tracing_appender::non_blocking(tracing_appender::rolling::daily(&logs_dir, "drift.log"));
+    let _ = LOG_GUARD.set(guard);
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    #[cfg(debug_assertions)]
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::layer().with_ansi(false).with_writer(nb))
+        .with(fmt::layer().with_writer(std::io::stdout))
+        .init();
+    #[cfg(not(debug_assertions))]
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::layer().with_ansi(false).with_writer(nb))
+        .init();
+}
+
 fn main() {
-    tracing_subscriber::fmt::init();
+    init_logging(&app_data_dir());
 
     // IMPORTANT: the single-instance plugin must be registered FIRST and all the
     // heavy initialization (the librqbit engine, which binds DHT/peer sockets)

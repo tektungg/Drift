@@ -95,8 +95,7 @@ impl SettingsStore {
         std::fs::create_dir_all(dir)?;
         let path = dir.join("config.json");
         let inner = if path.exists() {
-            let bytes = std::fs::read(&path)?;
-            serde_json::from_slice(&bytes).unwrap_or_default()
+            crate::persist::load_json_or_recover::<Config>(&path)
         } else {
             let c = Config::default();
             std::fs::write(&path, serde_json::to_vec_pretty(&c)?)?;
