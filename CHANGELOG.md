@@ -17,6 +17,11 @@ aims to follow semantic-ish versioning.
 - The UI no longer loads `@tauri-apps/api` from a CDN — the API is injected by
   Tauri (`withGlobalTauri`), so Drift now boots fully offline, and a strict
   Content-Security-Policy replaces the previous `csp: null`.
+### Fixed
+- `cargo tauri dev` no longer hangs on "Waiting for your frontend dev server":
+  the config declared an external dev server on port 1430 that nothing started.
+  Removing `build.devUrl` lets the Tauri CLI serve the static frontend with its
+  built-in dev server, as intended for a no-bundler app.
 
 ## [0.5.2] — 2026-06-03
 ### Fixed

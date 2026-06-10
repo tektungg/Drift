@@ -5,7 +5,6 @@
   "identifier": "com.tglabs.drift",
   "build": {
     "frontendDist": "../src",
-    "devUrl": "http://localhost:1430",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
   },
