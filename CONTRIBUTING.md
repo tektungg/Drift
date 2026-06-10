@@ -67,9 +67,23 @@ node --check src/main.js
 cargo tauri build
 ```
 
+## Conventions
+
+Commit messages, CHANGELOG entries, versioning, and the release/tag flow are
+standardized in **[CONVENTIONS.md](CONVENTIONS.md)** — read it before your first
+commit. In short: Conventional Commits (`type(scope): subject`), Keep a Changelog,
+SemVer, and **releases trigger only on `vX.Y.Z` tags, never on a plain push**.
+
+Enable the commit-message template once per clone:
+
+```powershell
+git config commit.template .gitmessage
+```
+
 ## Releases & the auto-updater
 
-Drift ships an in-app updater (`tauri-plugin-updater`) that polls
+The full release checklist is in [CONVENTIONS.md §4](CONVENTIONS.md#4-releases).
+In brief: Drift ships an in-app updater (`tauri-plugin-updater`) that polls
 `latest.json` on the GitHub Releases "latest" download URL and offers to install
 newer **signed** builds. The signing keypair is *not* in the repo:
 
@@ -99,5 +113,6 @@ must be re-applied. See `src-tauri/vendor/librqbit/NOTICE` for what changed.
 
 ## Commits & PRs
 
-- Write clear commit messages explaining the *why*.
+- Follow the commit + PR conventions in [CONVENTIONS.md](CONVENTIONS.md):
+  Conventional Commits, imperative subject, explain the *why* in the body.
 - Fill in the PR template and check the boxes you actually verified.

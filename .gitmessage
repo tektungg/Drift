@@ -1,0 +1,16 @@
+# <type>(<scope>): <subject>
+# └ ≤72 chars · imperative ("add", not "added") · lowercase · no trailing period
+#
+# Why this change (wrap at ~72; the diff already shows the "what"):
+#
+#
+# ── Reference ────────────────────────────────────────────────────────────────
+# type:  feat fix security perf refactor docs test build ci chore release
+# scope: engine queue state settings commands updater tray clipboard
+#        seeding ui ci release deps   (optional — use when it sharpens it)
+#
+# CHANGELOG: add a user-facing line under ## [Unreleased] for feat/fix/security.
+# Releases:  a normal push never releases — only pushing a vX.Y.Z tag does.
+#
+# Keep this trailer on AI-assisted commits:
+# Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
